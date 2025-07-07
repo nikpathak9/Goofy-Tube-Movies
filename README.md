@@ -2,7 +2,7 @@
 
 A modern, responsive video streaming platform inspired by YouTube. Powered by [TMDB API](https://www.themoviedb.org/), this app allows users to search for movies and TV shows, watch trailers with custom video controls, and manage their accounts with authentication support.
 
-![Goofy Tube Banner](<img width="1139" alt="Screenshot 2025-07-07 at 9 54 37 PM" src="https://github.com/user-attachments/assets/578fc61c-d419-483c-8126-9d8888770a35" />)
+<img width="1139" alt="Screenshot 2025-07-07 at 9 54 37 PM" src="https://github.com/user-attachments/assets/578fc61c-d419-483c-8126-9d8888770a35" />
 
 ---
 
@@ -22,8 +22,7 @@ A modern, responsive video streaming platform inspired by YouTube. Powered by [T
 - **Preview**:
 - <img width="1467" alt="Screenshot 2025-07-07 at 10 06 10 PM" src="https://github.com/user-attachments/assets/a77ee9a2-c652-432f-82f3-4f30b34376d7" />
 - <img width="1469" alt="Screenshot 2025-07-07 at 9 55 38 PM" src="https://github.com/user-attachments/assets/da03d3ae-2b6e-48ad-b87d-d8c592bb513e" />
-- <img width="580" alt="Screenshot 2025-07-07 at 9 53 48 PM" src="https://github.com/user-attachments/assets/7fd1a2c1-32e0-4bde-aa5b-724fc1b11a72" />
-- ![IMG_2210](https://github.com/user-attachments/assets/5ba8ce7b-a8f8-4f69-8105-379a47e342ac)
+- <img width="580" alt="Screenshot 2025-07-07 at 9 53 48 PM" src="https://github.com/user-attachments/assets/7fd1a2c1-32e0-4bde-aa5b-724fc1b11a72" /> <img width="580" alt="Screenshot 2025-07-07 at 9 53 48 PM" src="https://github.com/user-attachments/assets/5ba8ce7b-a8f8-4f69-8105-379a47e342ac" />
 
 
 
