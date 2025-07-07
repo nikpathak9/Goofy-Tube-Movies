@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/GT-logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Goofy Tube | Video Player</title>
+  </head>
+  <body>
+    <div id="loader" class="loader-screen">
+      <div class="loader-content">
+        <div class="film-spinner">
+          <div class="reel-circle"></div>
+          <div class="reel-circle"></div>
+          <div class="reel-circle"></div>
+          <div class="reel-hole"></div>
+        </div>
+        <p class="loading-text">Loading GoofyTube...</p>
+        <div class="progress-bar">
+          <div class="progress"></div>
+        </div>
+      </div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      const progressBar = document.getElementById("progress-bar");
+      let progress = 0;
+
+      const interval = setInterval(() => {
+        progress += Math.random() * 10;
+        if (progress >= 100) {
+          progress = 100;
+          clearInterval(interval);
+          document.getElementById("loader").classList.add("fade-out");
+        }
+        progressBar.style.width = progress + "%";
+      }, 300);
+    </script>
+  </body>
+</html>
