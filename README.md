@@ -20,7 +20,7 @@ A modern, responsive video streaming platform inspired by YouTube. Powered by [T
 
 ## 📸 Preview
 - **Preview**:
-- <img width="300" alt="Screenshot 2025-07-07 at 10 06 10 PM" src="https://github.com/user-attachments/assets/a77ee9a2-c652-432f-82f3-4f30b34376d7" /><img width="300" alt="Screenshot 2025-07-07 at 9 55 38 PM" src="https://github.com/user-attachments/assets/da03d3ae-2b6e-48ad-b87d-d8c592bb513e" />
+- <img width="500" alt="Screenshot 2025-07-07 at 10 06 10 PM" src="https://github.com/user-attachments/assets/a77ee9a2-c652-432f-82f3-4f30b34376d7" /><img width="500" alt="Screenshot 2025-07-07 at 9 55 38 PM" src="https://github.com/user-attachments/assets/da03d3ae-2b6e-48ad-b87d-d8c592bb513e" />
 -  <img width="200" alt="Screenshot 2025-07-07 at 9 53 48 PM" src="https://github.com/user-attachments/assets/b7d4e0aa-a3a3-4fdc-9a3a-b9ae8cf110b8" /><img width="200" alt="Screenshot 2025-07-07 at 9 53 48 PM" src="https://github.com/user-attachments/assets/5ba8ce7b-a8f8-4f69-8105-379a47e342ac" />
 
 
