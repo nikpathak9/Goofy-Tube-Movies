@@ -3,13 +3,83 @@ import { useParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import "./details.css";
+import { Link } from "react-router-dom";
 
 const MovieDetails = () => {
   const { id, type } = useParams();
   const [media, setMedia] = useState(null);
   const [loading, setLoading] = useState(true);
   const [trailerUrl, setTrailerUrl] = useState(null);
+  const [cast, setCast] = useState([]);
   const navigate = useNavigate();
+  const [recommendations, setRecommendations] = useState([]);
+  const [images, setImages] = useState([]);
+
+  useEffect(() => {
+    const fetchImages = async () => {
+      try {
+        const res = await fetch(
+          `https://api.themoviedb.org/3/${type}/${id}/images`,
+          {
+            headers: {
+              accept: "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
+            },
+          }
+        );
+        const data = await res.json();
+        setImages(data.backdrops?.slice(0, 10) || []);
+      } catch (err) {
+        console.error("Failed to fetch images:", err);
+      }
+    };
+
+    fetchImages();
+  }, [type, id]);
+
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      try {
+        const res = await fetch(
+          `https://api.themoviedb.org/3/${type}/${id}/recommendations`,
+          {
+            headers: {
+              accept: "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
+            },
+          }
+        );
+        const data = await res.json();
+        setRecommendations(data.results || []);
+      } catch (err) {
+        console.error("Failed to fetch recommendations:", err);
+      }
+    };
+
+    fetchRecommendations();
+  }, [type, id]);
+
+  useEffect(() => {
+    const fetchCast = async () => {
+      try {
+        const response = await fetch(
+          `https://api.themoviedb.org/3/${type}/${id}/credits`,
+          {
+            headers: {
+              accept: "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
+            },
+          }
+        );
+        const data = await response.json();
+        setCast(data.cast?.slice(0, 12) || []);
+      } catch (err) {
+        console.error("Error fetching cast:", err);
+      }
+    };
+
+    fetchCast();
+  }, [id, type]);
 
   useEffect(() => {
     const fetchVideo = async () => {
@@ -166,6 +236,82 @@ const MovieDetails = () => {
           )}
         </div>
       </div>
+      {images.length > 0 && (
+        <div className='extra-photos-section'>
+          <h2>Gallery</h2>
+          <div className='extra-photos-scroll'>
+            {images.map((img, i) => (
+              <img
+                key={i}
+                src={`https://image.tmdb.org/t/p/w500${img.file_path}`}
+                alt='Movie still'
+                className='extra-photo'
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {cast.length > 0 && (
+        <div className='cast-section'>
+          <h2>Top Cast</h2>
+          <div className='cast-grid'>
+            {cast.map((actor) => (
+              <div className='cast-card' key={actor.id}>
+                <img
+                  src={
+                    actor.profile_path
+                      ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
+                      : "https://upload.wikimedia.org/wikipedia/commons/1/14/No_Image_Available.jpg"
+                  }
+                  alt={actor.name}
+                />
+                <p className='actor-name'>{actor.name}</p>
+                <p className='character-name'>{actor.character}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {recommendations.length > 0 && (
+        <div className='recommendations-section' style={{ marginTop: "3rem" }}>
+          <h2 className='section-title'>Recommended for You</h2>
+          <div className='recommendation-scroll'>
+            {recommendations.map((movie) => (
+              <Link
+                to={`/details/${type}/${movie.id}`}
+                key={movie.id}
+                className='movie-card'
+              >
+                <img
+                  src={
+                    movie.poster_path
+                      ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+                      : "/fallback.jpg"
+                  }
+                  alt={movie.title || movie.name}
+                />
+                <div className='movie-overlay'>
+                  <h3>{movie.title || movie.name}</h3>
+                  <p>Rating: {movie.vote_average}</p>
+                  <p>
+                    Released:{" "}
+                    {(movie.release_date || movie.first_air_date) &&
+                      new Date(
+                        movie.release_date || movie.first_air_date
+                      ).toLocaleDateString("en-US", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

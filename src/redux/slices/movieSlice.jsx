@@ -11,6 +11,8 @@ const movieSlice = createSlice({
     tvTopRated: [],
     isLoading: false,
     error: null,
+    selectedGenreId: null,
+    selectedGenreType: null,
   },
   reducers: {
     setPopular: (state, action) => {
@@ -31,6 +33,10 @@ const movieSlice = createSlice({
     setError: (state, action) => {
       state.error = action.payload;
     },
+    setSelectedGenre: (state, action) => {
+      state.selectedGenre = action.payload.id;
+      state.selectedGenreType = action.payload.type;
+    },
   },
 });
 
@@ -41,6 +47,7 @@ export const {
   setTVTopRated,
   setLoading,
   setError,
+  setSelectedGenre,
 } = movieSlice.actions;
 
 export default movieSlice.reducer;

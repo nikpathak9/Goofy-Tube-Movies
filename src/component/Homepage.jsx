@@ -11,15 +11,28 @@ import {
 } from "../redux/slices/movieSlice";
 import { Link } from "react-router-dom";
 import HeroCarousel from "./HeroCarousel";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, Filter } from "lucide-react";
+import GenreFilter from "./GenreFilter";
 
 const API_BASE_URL = "https://api.themoviedb.org/3";
 
+const Loader = () => (
+  <div className='loader-wrapper'>
+    <div className='spinner'></div>
+  </div>
+);
+
 const Homepage = () => {
   const dispatch = useDispatch();
-  const { popular, topRated, tvPopular, tvTopRated, isLoading } = useSelector(
-    (state) => state.movies
-  );
+  const {
+    popular,
+    topRated,
+    tvPopular,
+    tvTopRated,
+    isLoading,
+    selectedGenre,
+    selectedGenreType,
+  } = useSelector((state) => state.movies);
   const [scrolledSections, setScrolledSections] = useState({});
 
   useEffect(() => {
@@ -38,16 +51,27 @@ const Homepage = () => {
         const [popularRes, topRatedRes, tvPopularRes, tvTopRatedRes] =
           await Promise.allSettled([
             fetch(
-              `${API_BASE_URL}/movie/popular?language=en-US&page=1`,
+              selectedGenre && selectedGenreType === "movie"
+                ? `${API_BASE_URL}/discover/movie?language=en-US&page=1&with_genres=${selectedGenre}`
+                : `${API_BASE_URL}/movie/popular?language=en-US&page=1`,
               headers
             ),
             fetch(
-              `${API_BASE_URL}/movie/top_rated?language=en-US&page=1`,
+              selectedGenre && selectedGenreType === "movie"
+                ? `${API_BASE_URL}/discover/movie?language=en-US&page=1&sort_by=vote_average.desc&with_genres=${selectedGenre}`
+                : `${API_BASE_URL}/movie/top_rated?language=en-US&page=1`,
               headers
             ),
-            fetch(`${API_BASE_URL}/tv/popular?language=en-US&page=1`, headers),
             fetch(
-              `${API_BASE_URL}/tv/top_rated?language=en-US&page=1`,
+              selectedGenre && selectedGenreType === "tv"
+                ? `${API_BASE_URL}/discover/tv?language=en-US&page=1&with_genres=${selectedGenre}`
+                : `${API_BASE_URL}/tv/popular?language=en-US&page=1`,
+              headers
+            ),
+            fetch(
+              selectedGenre && selectedGenreType === "tv"
+                ? `${API_BASE_URL}/discover/tv?language=en-US&page=1&sort_by=vote_average.desc&with_genres=${selectedGenre}`
+                : `${API_BASE_URL}/tv/top_rated?language=en-US&page=1`,
               headers
             ),
           ]);
@@ -56,7 +80,6 @@ const Homepage = () => {
           const data = await popularRes.value.json();
           dispatch(setPopular(data.results || []));
         } else {
-          console.warn("Popular movies failed");
           dispatch(setPopular([]));
         }
 
@@ -64,7 +87,6 @@ const Homepage = () => {
           const data = await topRatedRes.value.json();
           dispatch(setTopRated(data.results || []));
         } else {
-          console.warn("Top Rated movies failed");
           dispatch(setTopRated([]));
         }
 
@@ -72,7 +94,6 @@ const Homepage = () => {
           const data = await tvPopularRes.value.json();
           dispatch(setTVPopular(data.results || []));
         } else {
-          console.warn("Popular TV shows failed");
           dispatch(setTVPopular([]));
         }
 
@@ -80,11 +101,9 @@ const Homepage = () => {
           const data = await tvTopRatedRes.value.json();
           dispatch(setTVTopRated(data.results || []));
         } else {
-          console.warn("Top Rated TV shows failed");
           dispatch(setTVTopRated([]));
         }
       } catch (error) {
-        console.error("Unexpected error:", error);
         dispatch(setError("Something went wrong while fetching data."));
       } finally {
         dispatch(setLoading(false));
@@ -97,7 +116,7 @@ const Homepage = () => {
     };
 
     fetchMovies();
-  }, [dispatch]);
+  }, [dispatch, selectedGenre, selectedGenreType]);
 
   const scrollLeft = (id) => {
     const container = document.getElementById(id);
@@ -143,10 +162,13 @@ const Homepage = () => {
       <HeroCarousel />
 
       {isLoading ? (
-        <p>Loading content...</p>
+        <Loader />
       ) : (
         <>
-          // inside return (
+          <div className='global-genre-filter'>
+            <GenreFilter type='movie' />
+          </div>
+          {/* POPULAR MOVIES */}
           {popular.length > 0 && (
             <div className='movie-section'>
               <h1>Popular Movies</h1>
@@ -159,7 +181,6 @@ const Homepage = () => {
                     <ChevronLeftIcon />
                   </button>
                 )}
-
                 <div className='movie-grid' id='popular'>
                   {popular.map((movie) => (
                     <Link
@@ -194,7 +215,6 @@ const Homepage = () => {
                     </Link>
                   ))}
                 </div>
-
                 <button
                   className='carousel-btn next'
                   onClick={() => scrollRight("popular")}
@@ -204,6 +224,7 @@ const Homepage = () => {
               </div>
             </div>
           )}
+          {/* TOP RATED MOVIES */}
           {topRated.length > 0 && (
             <div className='movie-section'>
               <h1>Top Rated Movies</h1>
@@ -216,7 +237,6 @@ const Homepage = () => {
                     <ChevronLeftIcon />
                   </button>
                 )}
-
                 <div className='movie-grid' id='topRated'>
                   {topRated.map((movie) => (
                     <Link
@@ -251,7 +271,6 @@ const Homepage = () => {
                     </Link>
                   ))}
                 </div>
-
                 <button
                   className='carousel-btn next'
                   onClick={() => scrollRight("topRated")}
@@ -261,6 +280,7 @@ const Homepage = () => {
               </div>
             </div>
           )}
+          {/* POPULAR TV SHOWS */}
           {tvPopular.length > 0 && (
             <div className='movie-section'>
               <h1>Popular TV Shows</h1>
@@ -273,7 +293,6 @@ const Homepage = () => {
                     <ChevronLeftIcon />
                   </button>
                 )}
-
                 <div className='movie-grid' id='tvPopular'>
                   {tvPopular.map((show) => (
                     <Link
@@ -308,7 +327,6 @@ const Homepage = () => {
                     </Link>
                   ))}
                 </div>
-
                 <button
                   className='carousel-btn next'
                   onClick={() => scrollRight("tvPopular")}
@@ -318,6 +336,7 @@ const Homepage = () => {
               </div>
             </div>
           )}
+          {/* TOP RATED TV SHOWS */}
           {tvTopRated.length > 0 && (
             <div className='movie-section'>
               <h1>Top Rated TV Shows</h1>
@@ -330,7 +349,6 @@ const Homepage = () => {
                     <ChevronLeftIcon />
                   </button>
                 )}
-
                 <div className='movie-grid' id='tvTopRated'>
                   {tvTopRated.map((show) => (
                     <Link
@@ -365,7 +383,6 @@ const Homepage = () => {
                     </Link>
                   ))}
                 </div>
-
                 <button
                   className='carousel-btn next'
                   onClick={() => scrollRight("tvTopRated")}

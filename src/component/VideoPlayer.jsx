@@ -11,7 +11,7 @@ import {
   Subtitles,
   ArrowLeft,
 } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   setPlaying,
@@ -19,6 +19,7 @@ import {
   setCurrentTime,
   setDuration,
 } from "../redux/slices/videoSlice";
+import "./video.css";
 
 const VideoPlayer = () => {
   const videoRef = useRef(null);
@@ -32,6 +33,7 @@ const VideoPlayer = () => {
   const [mediaReleaseDate, setMediaReleaseDate] = useState("");
   const [mediaRuntime, setMediaRuntime] = useState("");
   const [mediaGenres, setMediaGenres] = useState([]);
+  const [recommendations, setRecommendations] = useState([]);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -175,6 +177,28 @@ const VideoPlayer = () => {
     };
   }, [trailerUrl, dispatch]);
 
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      try {
+        const res = await fetch(
+          `https://api.themoviedb.org/3/${type}/${id}/recommendations?language=en-US&page=1`,
+          {
+            headers: {
+              accept: "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
+            },
+          }
+        );
+        const data = await res.json();
+        setRecommendations(data.results || []);
+      } catch (err) {
+        console.error("Failed to fetch recommendations:", err);
+      }
+    };
+
+    fetchRecommendations();
+  }, [id, type]);
+
   // Handle player source change
   useEffect(() => {
     if (playerReady && playerRef.current && trailerUrl) {
@@ -282,7 +306,7 @@ const VideoPlayer = () => {
                           }
                         }}
                       >
-                        <Maximize2 size={16} /> 
+                        <Maximize2 size={16} />
                       </button>
                     </div>
                   </div>
@@ -300,6 +324,44 @@ const VideoPlayer = () => {
                 </div>
               </div>
             </div>
+            {recommendations.length > 0 && (
+              <div className='recommendations-section'>
+                <h2 className='section-title'>Recommended for You</h2>
+                <div className='recommendation-scroll'>
+                  {recommendations.map((movie) => (
+                    <Link
+                      to={`/details/${type}/${movie.id}`}
+                      key={movie.id}
+                      className='movie-card'
+                    >
+                      <img
+                        src={
+                          movie.poster_path
+                            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+                            : "/fallback.jpg"
+                        }
+                        alt={movie.title || movie.name}
+                      />
+                      <div className='movie-overlay'>
+                        <h3>{movie.title || movie.name}</h3>
+                        <p>Rating: {movie.vote_average}</p>
+                        <p>
+                          Released:{" "}
+                          {(movie.release_date || movie.first_air_date) &&
+                            new Date(
+                              movie.release_date || movie.first_air_date
+                            ).toLocaleDateString("en-US", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
