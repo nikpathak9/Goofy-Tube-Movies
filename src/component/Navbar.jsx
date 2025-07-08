@@ -82,7 +82,7 @@ const Navbar = () => {
     setQuery("");
     setResults([]);
     setMenuOpen(false);
-    navigate(`/search/${encodeURIComponent(query)}`);
+    navigate(`/details/${item.media_type}/${item.id}`);
   };
 
   useEffect(() => {
@@ -146,13 +146,24 @@ const Navbar = () => {
 
             {results.length > 0 && (
               <ul className='search-results'>
-                {results.map((item) => (
+                {results.slice(0, 6).map((item) => (
                   <li
-                    key={item.id}
+                    key={`${item.media_type}-${item.id}`}
                     className='search-result-item'
-                    onClick={() => handleResultClick()}
+                    onClick={() => handleResultClick(item)}
                   >
-                    {item.title || item.name}
+                    <img
+                      className='search-result-img'
+                      src={
+                        item.poster_path || item.profile_path
+                          ? `https://image.tmdb.org/t/p/w92${
+                              item.poster_path || item.profile_path
+                            }`
+                          : "https://via.placeholder.com/40x60?text=No+Image"
+                      }
+                      alt={item.title || item.name}
+                    />
+                    <span>{item.title || item.name}</span>
                   </li>
                 ))}
               </ul>
