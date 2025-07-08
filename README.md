@@ -20,8 +20,10 @@ A modern, responsive video streaming platform inspired by YouTube. Powered by [T
 
 ## 📸 Preview
 - **Preview**:
-- <img width="500" alt="Screenshot 2025-07-07 at 10 06 10 PM" src="https://github.com/user-attachments/assets/a77ee9a2-c652-432f-82f3-4f30b34376d7" /><img width="500" alt="Screenshot 2025-07-07 at 9 55 38 PM" src="https://github.com/user-attachments/assets/da03d3ae-2b6e-48ad-b87d-d8c592bb513e" />
--  <img width="200" alt="Screenshot 2025-07-07 at 9 53 48 PM" src="https://github.com/user-attachments/assets/b7d4e0aa-a3a3-4fdc-9a3a-b9ae8cf110b8" /><img width="200" alt="Screenshot 2025-07-07 at 9 53 48 PM" src="https://github.com/user-attachments/assets/5ba8ce7b-a8f8-4f69-8105-379a47e342ac" />
+- <img width="500" alt="Screenshot 2025-07-09 at 5 19 28 AM" src="https://github.com/user-attachments/assets/b84295ea-909e-4e9e-aaa5-9e0ee96b50fd" /><img width="500" alt="Screenshot 2025-07-09 at 5 19 50 AM" src="https://github.com/user-attachments/assets/762e98f3-a0b9-4dd6-ad47-83ffecedd1ce" /><img width="500" alt="Screenshot 2025-07-09 at 5 20 13 AM" src="https://github.com/user-attachments/assets/dae020cc-fa26-4a7d-b591-387ef1560eac" />
+
+-  <img width="200" alt="Screenshot 2025-07-09 at 5 20 32 AM" src="https://github.com/user-attachments/assets/c4346199-3fd0-4350-addb-36a6e2507da3" />
+<img width="200" alt="Screenshot 2025-07-09 at 5 21 15 AM" src="https://github.com/user-attachments/assets/5460ef8a-ae33-4601-b519-ab256c6b2b37" /><img width="200" alt="Screenshot 2025-07-09 at 5 23 52 AM" src="https://github.com/user-attachments/assets/1c740671-4842-4576-bd45-7917ce5de32a" />
 
 
 
