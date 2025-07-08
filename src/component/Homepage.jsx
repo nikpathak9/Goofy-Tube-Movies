@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import "./homepage.css";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -11,6 +11,7 @@ import {
 } from "../redux/slices/movieSlice";
 import { Link } from "react-router-dom";
 import HeroCarousel from "./HeroCarousel";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
 const API_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -19,6 +20,7 @@ const Homepage = () => {
   const { popular, topRated, tvPopular, tvTopRated, isLoading } = useSelector(
     (state) => state.movies
   );
+  const [scrolledSections, setScrolledSections] = useState({});
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -97,6 +99,39 @@ const Homepage = () => {
     fetchMovies();
   }, [dispatch]);
 
+  const scrollLeft = (id) => {
+    const container = document.getElementById(id);
+    if (container) {
+      container.scrollBy({
+        left: -container.offsetWidth,
+        behavior: "smooth",
+      });
+
+      setTimeout(() => {
+        const isAtStart = container.scrollLeft - container.offsetWidth <= 0;
+        setScrolledSections((prev) => ({
+          ...prev,
+          [id]: !isAtStart,
+        }));
+      }, 400);
+    }
+  };
+
+  const scrollRight = (id) => {
+    const container = document.getElementById(id);
+    if (container) {
+      container.scrollBy({
+        left: container.offsetWidth,
+        behavior: "smooth",
+      });
+
+      setScrolledSections((prev) => ({
+        ...prev,
+        [id]: true,
+      }));
+    }
+  };
+
   return (
     <div className='homepage-container'>
       <div className='homepage-header'>
@@ -111,162 +146,232 @@ const Homepage = () => {
         <p>Loading content...</p>
       ) : (
         <>
+          // inside return (
           {popular.length > 0 && (
             <div className='movie-section'>
               <h1>Popular Movies</h1>
-              <div className='movie-grid'>
-                {popular.map((movie) => (
-                  <Link
-                    to={`/details/movie/${movie.id}`}
-                    className='movie-card'
-                    key={movie.id}
+              <div className='carousel-wrapper'>
+                {scrolledSections["popular"] && (
+                  <button
+                    className='carousel-btn prev'
+                    onClick={() => scrollLeft("popular")}
                   >
-                    <img
-                      src={
-                        movie.poster_path
-                          ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-                          : `{media.backdrop_path}`
-                      }
-                      alt={movie.title}
-                    />
-                    <div className='movie-overlay'>
-                      <h3>{movie.title}</h3>
-                      <p>Rating: {movie.vote_average}</p>
-                      <p>
-                        Released:{" "}
-                        {movie.release_date &&
-                          new Date(movie.release_date).toLocaleDateString(
-                            "en-US",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            }
-                          )}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
+                    <ChevronLeftIcon />
+                  </button>
+                )}
+
+                <div className='movie-grid' id='popular'>
+                  {popular.map((movie) => (
+                    <Link
+                      to={`/details/movie/${movie.id}`}
+                      className='movie-card'
+                      key={movie.id}
+                    >
+                      <img
+                        src={
+                          movie.poster_path
+                            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+                            : ""
+                        }
+                        alt={movie.title}
+                      />
+                      <div className='movie-overlay'>
+                        <h3>{movie.title}</h3>
+                        <p>Rating: {movie.vote_average}</p>
+                        <p>
+                          Released:{" "}
+                          {movie.release_date &&
+                            new Date(movie.release_date).toLocaleDateString(
+                              "en-US",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              }
+                            )}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+
+                <button
+                  className='carousel-btn next'
+                  onClick={() => scrollRight("popular")}
+                >
+                  <ChevronRightIcon />
+                </button>
               </div>
             </div>
           )}
-
           {topRated.length > 0 && (
             <div className='movie-section'>
               <h1>Top Rated Movies</h1>
-              <div className='movie-grid'>
-                {topRated.map((movie) => (
-                  <Link
-                    to={`/details/movie/${movie.id}`}
-                    className='movie-card'
-                    key={movie.id}
+              <div className='carousel-wrapper'>
+                {scrolledSections["topRated"] && (
+                  <button
+                    className='carousel-btn prev'
+                    onClick={() => scrollLeft("topRated")}
                   >
-                    <img
-                      src={
-                        movie.poster_path
-                          ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-                          : `{media.backdrop_path}`
-                      }
-                      alt={movie.title}
-                    />
-                    <div className='movie-overlay'>
-                      <h3>{movie.title}</h3>
-                      <p>Rating: {movie.vote_average}</p>
-                      <p>
-                        Released:{" "}
-                        {movie.release_date &&
-                          new Date(movie.release_date).toLocaleDateString(
-                            "en-US",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            }
-                          )}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
+                    <ChevronLeftIcon />
+                  </button>
+                )}
+
+                <div className='movie-grid' id='topRated'>
+                  {topRated.map((movie) => (
+                    <Link
+                      to={`/details/movie/${movie.id}`}
+                      className='movie-card'
+                      key={movie.id}
+                    >
+                      <img
+                        src={
+                          movie.poster_path
+                            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+                            : ""
+                        }
+                        alt={movie.title}
+                      />
+                      <div className='movie-overlay'>
+                        <h3>{movie.title}</h3>
+                        <p>Rating: {movie.vote_average}</p>
+                        <p>
+                          Released:{" "}
+                          {movie.release_date &&
+                            new Date(movie.release_date).toLocaleDateString(
+                              "en-US",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              }
+                            )}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+
+                <button
+                  className='carousel-btn next'
+                  onClick={() => scrollRight("topRated")}
+                >
+                  <ChevronRightIcon />
+                </button>
               </div>
             </div>
           )}
-
           {tvPopular.length > 0 && (
             <div className='movie-section'>
               <h1>Popular TV Shows</h1>
-              <div className='movie-grid'>
-                {tvPopular.map((show) => (
-                  <Link
-                    to={`/details/tv/${show.id}`}
-                    className='movie-card'
-                    key={show.id}
+              <div className='carousel-wrapper'>
+                {scrolledSections["tvPopular"] && (
+                  <button
+                    className='carousel-btn prev'
+                    onClick={() => scrollLeft("tvPopular")}
                   >
-                    <img
-                      src={
-                        show.poster_path
-                          ? `https://image.tmdb.org/t/p/w500${show.poster_path}`
-                          : `{media.backdrop_path}`
-                      }
-                      alt={show.name}
-                    />
-                    <div className='movie-overlay'>
-                      <h3>{show.name}</h3>
-                      <p>Rating: {show.vote_average}</p>
-                      <p>
-                        Released:{""}
-                        {show.first_air_date &&
-                          new Date(show.first_air_date).toLocaleDateString(
-                            "en-US",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            }
-                          )}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
+                    <ChevronLeftIcon />
+                  </button>
+                )}
+
+                <div className='movie-grid' id='tvPopular'>
+                  {tvPopular.map((show) => (
+                    <Link
+                      to={`/details/tv/${show.id}`}
+                      className='movie-card'
+                      key={show.id}
+                    >
+                      <img
+                        src={
+                          show.poster_path
+                            ? `https://image.tmdb.org/t/p/w500${show.poster_path}`
+                            : ""
+                        }
+                        alt={show.name}
+                      />
+                      <div className='movie-overlay'>
+                        <h3>{show.name}</h3>
+                        <p>Rating: {show.vote_average}</p>
+                        <p>
+                          Released:{" "}
+                          {show.first_air_date &&
+                            new Date(show.first_air_date).toLocaleDateString(
+                              "en-US",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              }
+                            )}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+
+                <button
+                  className='carousel-btn next'
+                  onClick={() => scrollRight("tvPopular")}
+                >
+                  <ChevronRightIcon />
+                </button>
               </div>
             </div>
           )}
-
           {tvTopRated.length > 0 && (
             <div className='movie-section'>
               <h1>Top Rated TV Shows</h1>
-              <div className='movie-grid'>
-                {tvTopRated.map((show) => (
-                  <Link
-                    to={`/details/tv/${show.id}`}
-                    className='movie-card'
-                    key={show.id}
+              <div className='carousel-wrapper'>
+                {scrolledSections["tvTopRated"] && (
+                  <button
+                    className='carousel-btn prev'
+                    onClick={() => scrollLeft("tvTopRated")}
                   >
-                    <img
-                      src={
-                        show.poster_path
-                          ? `https://image.tmdb.org/t/p/w500${show.poster_path}`
-                          : `{media.backdrop_path}`
-                      }
-                      alt={show.name}
-                    />
-                    <div className='movie-overlay'>
-                      <h3>{show.name}</h3>
-                      <p>Rating: {show.vote_average}</p>
-                      <p>
-                        Released:{" "}
-                        {show.first_air_date &&
-                          new Date(show.first_air_date).toLocaleDateString(
-                            "en-US",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            }
-                          )}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
+                    <ChevronLeftIcon />
+                  </button>
+                )}
+
+                <div className='movie-grid' id='tvTopRated'>
+                  {tvTopRated.map((show) => (
+                    <Link
+                      to={`/details/tv/${show.id}`}
+                      className='movie-card'
+                      key={show.id}
+                    >
+                      <img
+                        src={
+                          show.poster_path
+                            ? `https://image.tmdb.org/t/p/w500${show.poster_path}`
+                            : ""
+                        }
+                        alt={show.name}
+                      />
+                      <div className='movie-overlay'>
+                        <h3>{show.name}</h3>
+                        <p>Rating: {show.vote_average}</p>
+                        <p>
+                          Released:{" "}
+                          {show.first_air_date &&
+                            new Date(show.first_air_date).toLocaleDateString(
+                              "en-US",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              }
+                            )}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+
+                <button
+                  className='carousel-btn next'
+                  onClick={() => scrollRight("tvTopRated")}
+                >
+                  <ChevronRightIcon />
+                </button>
               </div>
             </div>
           )}

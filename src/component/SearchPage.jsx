@@ -48,9 +48,15 @@ const SearchPage = () => {
       </div>
 
       {loading ? (
-        <p>Loading...</p>
+        <div className='spinner-container'>
+          <div className='loading-spinner'></div>
+        </div>
       ) : results.length === 0 ? (
-        <p>No results found.</p>
+        <div className='fallback-container'>
+          <p className='fallback-text'>
+            No results found. Try a different keyword!
+          </p>
+        </div>
       ) : (
         <div className='search-grid-container'>
           {results.map((item) => (

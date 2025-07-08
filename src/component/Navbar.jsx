@@ -79,11 +79,10 @@ const Navbar = () => {
   }, [query]);
 
   const handleResultClick = (item) => {
-    const type = item.media_type === "tv" ? "tv" : "movie";
     setQuery("");
     setResults([]);
     setMenuOpen(false);
-    navigate(`/details/${type}/${item.id}`);
+    navigate(`/search/${encodeURIComponent(query)}`);
   };
 
   useEffect(() => {
@@ -151,7 +150,7 @@ const Navbar = () => {
                   <li
                     key={item.id}
                     className='search-result-item'
-                    onClick={() => handleResultClick(item)}
+                    onClick={() => handleResultClick()}
                   >
                     {item.title || item.name}
                   </li>

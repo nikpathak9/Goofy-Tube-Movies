@@ -1,9 +1,16 @@
+@import url("https://fonts.googleapis.com/css2?family=Mona+Sans:ital,wght@0,200..900;1,200..900&display=swap");
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 .search-page {
   padding: 2rem;
-  background-color: transparent;
-  min-height: 100vh;
-  color: #f3f3f3;
   font-family: "Mona Sans", sans-serif;
+  color: #f3f3f3;
+  min-height: 100vh;
   max-width: 90%;
   margin: 2rem auto;
   background: rgba(255, 255, 255, 0.04);
@@ -13,11 +20,18 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
+.search-heading-container {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+  width: 100%;
+}
+
 .search-heading {
   font-size: 2.5rem;
   font-weight: 700;
-  text-align: center;
-  margin-bottom: 2rem;
   background: linear-gradient(135deg, #a78bfa, #7c3aed);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -25,8 +39,9 @@
 
 .search-grid-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  justify-items: stretch;
 }
 
 .search-card {
@@ -40,6 +55,8 @@
   background-color: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 200px;
 }
 
 .search-card:hover {
@@ -48,24 +65,24 @@
 
 .search-card img {
   width: 100%;
-  height: 100%;
+  height: 300px;
   object-fit: cover;
   border-radius: 12px;
+  display: block;
 }
 
 .search-card-overlay {
   position: absolute;
-  bottom: 0;
-  width: 100%;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), transparent);
-  color: white;
-  padding: 0.75rem 1rem;
-  font-size: 0.9rem;
+  inset: 0;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  transition: opacity 0.3s ease;
+  padding: 1rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), transparent);
+  color: white;
   opacity: 0;
+  transition: opacity 0.3s ease;
+  border-radius: 12px;
 }
 
 .search-card:hover .search-card-overlay {
@@ -79,44 +96,86 @@
 }
 
 .search-card-overlay p {
-  margin: 0.25rem 0 0;
+  margin-top: 0.25rem;
   font-size: 0.85rem;
   color: #ccc;
 }
 
-.search-heading-container {
+/* Spinner */
+.spinner-container {
   display: flex;
-  justify-content: start;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.loading-spinner {
+  border: 5px solid rgba(255, 255, 255, 0.2);
+  border-top: 5px solid #a78bfa;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
   margin-bottom: 1rem;
-  gap: 1rem;
-  width: 100%;
-  font-size: 15px;
+}
+
+.spinner-text {
+  color: #f3f3f3;
+  font-family: "Mona Sans", sans-serif;
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Fallback */
+.fallback-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  font-family: "Mona Sans", sans-serif;
+}
+
+.fallback-text {
+  font-size: 1.1rem;
+  color: #f3f3f3;
+  opacity: 0.8;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
   .search-heading {
     font-size: 1.75rem;
+    text-align: left;
   }
 
   .search-grid-container {
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 1rem;
-    width: 100%;
   }
 
-  .search-card img {
-    width: 100%;
-    height: 200px;
-  }
-
+  .search-card img,
   .search-card-overlay {
-    width: 100%;
-    height: 200px;
+    height: 220px;
   }
 
   .search-card-overlay h3 {
     font-size: 0.9rem;
+  }
+
+  .search-card-overlay p {
+    font-size: 0.75rem;
   }
 }
