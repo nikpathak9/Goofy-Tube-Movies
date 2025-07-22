@@ -432,6 +432,7 @@ body {
   background-color: #000;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
   position: relative;
+  height: 100%;
 }
 
 .video-js {
@@ -513,6 +514,95 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 0 0 12px 12px;
   transition: all 0.3s ease;
+  will-change: opacity, transform;
+}
+
+.custom-controls.hidden {
+  opacity: 0;
+  transform: translateY(100%);
+  pointer-events: none;
+}
+
+.custom-controls.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: black;
+  overflow: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.video-js.vjs-fullscreen,
+.video-wrapper:fullscreen,
+.video-wrapper:-webkit-full-screen,
+.video-wrapper:-moz-full-screen,
+.video-wrapper:-ms-fullscreen {
+  width: 100% !important;
+  height: 100% !important;
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+}
+
+/* iOS specific styles */
+.video-js.vjs-ios-native {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Hide custom controls in fullscreen mode */
+:-webkit-full-screen .custom-controls,
+:-moz-full-screen .custom-controls,
+:-ms-fullscreen .custom-controls,
+:fullscreen .custom-controls {
+  display: none !important;
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+  .control-button[aria-label="Fullscreen"] {
+    display: flex !important;
+  }
+
+  .controls-content {
+    padding: 8px;
+    gap: 0.5rem; /* Reduced gap for mobile */
+  }
+
+  .seek-slider {
+    margin: 0 8px;
+    height: 4px; /* Thinner slider for mobile */
+  }
+
+  .custom-controls {
+    padding: 6px 8px; /* Reduced padding */
+  }
+
+  /* Larger tap targets for mobile */
+  .control-button {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+/* Ensure proper video sizing */
+.video-js {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+}
+
+/* Prevent iOS zooming on double-tap */
+.video-wrapper {
+  touch-action: manipulation;
 }
 
 .video-js.vjs-fullscreen .custom-controls {

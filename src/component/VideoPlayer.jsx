@@ -36,13 +36,26 @@ const VideoPlayer = () => {
   const [recommendations, setRecommendations] = useState([]);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const hideControlsTimer = useRef(null);
+
+  const showControlsTemporarily = () => {
+    setControlsVisible(true);
+    if (hideControlsTimer.current) {
+      clearTimeout(hideControlsTimer.current);
+    }
+
+    if (isPlaying) {
+      hideControlsTimer.current = setTimeout(() => {
+        setControlsVisible(false);
+      }, 1500);
+    }
+  };
 
   const dispatch = useDispatch();
   const { isPlaying, isMuted, currentTime, duration } = useSelector(
     (state) => state.video
   );
-
-  // Fetch trailer and metadata
   useEffect(() => {
     let isMounted = true;
 
@@ -164,6 +177,10 @@ const VideoPlayer = () => {
         console.error("Video player error");
         setIsLoading(false);
       });
+
+      player.on("fullscreenchange", () => {
+        showControlsTemporarily();
+      });
     };
 
     // Add slight delay to ensure DOM is ready
@@ -205,6 +222,14 @@ const VideoPlayer = () => {
       playerRef.current.src({ type: "video/youtube", src: trailerUrl });
     }
   }, [trailerUrl, playerReady]);
+
+  useEffect(() => {
+    return () => {
+      if (hideControlsTimer.current) {
+        clearTimeout(hideControlsTimer.current);
+      }
+    };
+  }, []);
 
   const togglePlay = () => {
     if (playerRef.current) {
@@ -252,62 +277,87 @@ const VideoPlayer = () => {
             </button>
             <div className='video-and-info'>
               <div className='video-container'>
-                <div className='video-wrapper'>
-                  <div data-vjs-player>
+                <div
+                  className='video-wrapper'
+                  onMouseMove={showControlsTemporarily}
+                  onClick={showControlsTemporarily}
+                  onTouchStart={showControlsTemporarily}
+                >
+                  <div data-vjs-player className='player-wrapper'>
                     <video
                       ref={videoRef}
-                      className='video-js vjs-default-skin video-element'
+                      className='video-js vjs-default-skin video-element vjs-big-play-centered'
                       playsInline
-                      data-setup='{}'
                     />
-                  </div>
-                  {isLoading && (
-                    <div className='loading-spinner'>
-                      <div className='spinner'></div>
-                    </div>
-                  )}
-                  <div className='custom-controls'>
-                    <div className='controls-content'>
-                      <button onClick={togglePlay} className='control-button'>
-                        {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-                      </button>
-                      <button onClick={toggleMute} className='control-button'>
-                        {isMuted ? (
-                          <>
+                    {isLoading && (
+                      <div className='loading-spinner'>
+                        <div className='spinner'></div>
+                      </div>
+                    )}
+                    <div
+                      className={`custom-controls ${
+                        controlsVisible ? "visible" : "hidden"
+                      }`}
+                    >
+                      <div className='controls-content'>
+                        <button onClick={togglePlay} className='control-button'>
+                          {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                        </button>
+                        <button onClick={toggleMute} className='control-button'>
+                          {isMuted ? (
                             <VolumeX size={16} />
-                          </>
-                        ) : (
-                          <>
+                          ) : (
                             <Volume2 size={16} />
-                          </>
-                        )}
-                      </button>
-                      <input
-                        type='range'
-                        min='0'
-                        max={duration || 0}
-                        value={currentTime}
-                        onChange={handleSeek}
-                        step='0.1'
-                        className='seek-slider'
-                      />
-                      <span className='time-display'>
-                        {formatTime(currentTime)} / {formatTime(duration)}
-                      </span>
-                      <button
-                        className='control-button'
-                        onClick={() => {
-                          if (playerRef.current) {
-                            if (playerRef.current.isFullscreen()) {
-                              playerRef.current.exitFullscreen();
-                            } else {
-                              playerRef.current.requestFullscreen();
+                          )}
+                        </button>
+                        <input
+                          type='range'
+                          min='0'
+                          max={duration || 0}
+                          value={currentTime}
+                          onChange={handleSeek}
+                          step='0.1'
+                          className='seek-slider'
+                        />
+                        <span className='time-display'>
+                          {formatTime(currentTime)} / {formatTime(duration)}
+                        </span>
+                        <button
+                          className='control-button'
+                          onClick={() => {
+                            if (playerRef.current) {
+                              const videoWrapper =
+                                document.querySelector(".video-wrapper");
+                              if (
+                                document.fullscreenElement ||
+                                document.webkitFullscreenElement ||
+                                document.mozFullScreenElement ||
+                                document.msFullscreenElement
+                              ) {
+                                if (document.exitFullscreen)
+                                  document.exitFullscreen();
+                                else if (document.webkitExitFullscreen)
+                                  document.webkitExitFullscreen();
+                                else if (document.mozCancelFullScreen)
+                                  document.mozCancelFullScreen();
+                                else if (document.msExitFullscreen)
+                                  document.msExitFullscreen();
+                              } else {
+                                if (videoWrapper.requestFullscreen)
+                                  videoWrapper.requestFullscreen();
+                                else if (videoWrapper.webkitRequestFullscreen)
+                                  videoWrapper.webkitRequestFullscreen();
+                                else if (videoWrapper.mozRequestFullScreen)
+                                  videoWrapper.mozRequestFullScreen();
+                                else if (videoWrapper.msRequestFullscreen)
+                                  videoWrapper.msRequestFullscreen();
+                              }
                             }
-                          }
-                        }}
-                      >
-                        <Maximize2 size={16} />
-                      </button>
+                          }}
+                        >
+                          <Maximize2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
