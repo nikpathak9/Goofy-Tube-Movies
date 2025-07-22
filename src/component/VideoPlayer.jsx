@@ -10,6 +10,9 @@ import {
   Maximize2,
   Subtitles,
   ArrowLeft,
+  Minimize2,
+  Expand,
+  Minimize,
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -34,6 +37,7 @@ const VideoPlayer = () => {
   const [mediaRuntime, setMediaRuntime] = useState("");
   const [mediaGenres, setMediaGenres] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -325,37 +329,47 @@ const VideoPlayer = () => {
                         <button
                           className='control-button'
                           onClick={() => {
-                            if (playerRef.current) {
-                              const videoWrapper =
-                                document.querySelector(".video-wrapper");
-                              if (
-                                document.fullscreenElement ||
-                                document.webkitFullscreenElement ||
-                                document.mozFullScreenElement ||
-                                document.msFullscreenElement
-                              ) {
-                                if (document.exitFullscreen)
-                                  document.exitFullscreen();
-                                else if (document.webkitExitFullscreen)
-                                  document.webkitExitFullscreen();
-                                else if (document.mozCancelFullScreen)
-                                  document.mozCancelFullScreen();
-                                else if (document.msExitFullscreen)
-                                  document.msExitFullscreen();
-                              } else {
-                                if (videoWrapper.requestFullscreen)
-                                  videoWrapper.requestFullscreen();
-                                else if (videoWrapper.webkitRequestFullscreen)
-                                  videoWrapper.webkitRequestFullscreen();
-                                else if (videoWrapper.mozRequestFullScreen)
-                                  videoWrapper.mozRequestFullScreen();
-                                else if (videoWrapper.msRequestFullscreen)
-                                  videoWrapper.msRequestFullscreen();
+                            const videoWrapper =
+                              document.querySelector(".video-wrapper");
+
+                            if (!videoWrapper) return;
+
+                            const isFullscreen =
+                              document.fullscreenElement ||
+                              document.webkitFullscreenElement ||
+                              document.mozFullScreenElement ||
+                              document.msFullscreenElement;
+
+                            if (isFullscreen) {
+                              if (document.exitFullscreen) {
+                                document.exitFullscreen();
+                              } else if (document.webkitExitFullscreen) {
+                                document.webkitExitFullscreen();
+                              } else if (document.mozCancelFullScreen) {
+                                document.mozCancelFullScreen();
+                              } else if (document.msExitFullscreen) {
+                                document.msExitFullscreen();
+                              }
+                            } else {
+                              if (videoWrapper.requestFullscreen) {
+                                videoWrapper.requestFullscreen();
+                              } else if (videoWrapper.webkitRequestFullscreen) {
+                                videoWrapper.webkitRequestFullscreen();
+                              } else if (videoWrapper.mozRequestFullScreen) {
+                                videoWrapper.mozRequestFullScreen();
+                              } else if (videoWrapper.msRequestFullscreen) {
+                                videoWrapper.msRequestFullscreen();
                               }
                             }
+
+                            setIsFullScreen((prev) => !prev);
                           }}
                         >
-                          <Maximize2 size={16} />
+                          {isFullScreen ? (
+                            <Minimize size={16} />
+                          ) : (
+                            <Expand size={16} />
+                          )}
                         </button>
                       </div>
                     </div>
