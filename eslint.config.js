@@ -23,7 +23,14 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Without eslint-plugin-react, ESLint can't see identifiers used only
+      // in JSX. The existing varsIgnorePattern covers imported components;
+      // argsIgnorePattern extends the same allowance to component props that
+      // are themselves components (e.g. `({ icon: Icon }) => <Icon />`).
+      'no-unused-vars': [
+        'error',
+        { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' },
+      ],
     },
   },
 ])

@@ -1,216 +1,227 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Search, Video, X, User, LogIn } from "lucide-react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { Search, LogIn, Menu, X } from "lucide-react";
+// (X is used by the mobile toggle below.)
+import SearchPalette from "./SearchPalette";
+import { useRetractableNav } from "../lib/useRetractableNav";
+import { useReducedMotion } from "../lib/useReducedMotion";
+import { useAuth } from "../lib/useAuth";
+
+const NAV_LINKS = [
+  { to: "/", label: "Home", end: true },
+  { to: "/browse/movie", label: "Movies" },
+  { to: "/browse/tv", label: "Series" },
+];
 
 const Navbar = () => {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
-  const [typingTimeout, setTypingTimeout] = useState(null);
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // Peek = temporarily expanded while hovered/focused/tapped in compact mode.
+  const [peek, setPeek] = useState(false);
+  const peekCloseTimer = useRef(null);
+  const { collapsed, atTop } = useRetractableNav();
+  const reduced = useReducedMotion();
   const location = useLocation();
-  const navigate = useNavigate();
-  const dropdownRef = useRef(null);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    } else {
-      setUser(null);
-    }
-  }, [location]);
-
-  useEffect(() => {
-    setQuery("");
-    setResults([]);
+    setMobileOpen(false);
+    setPeek(false);
+    clearTimeout(peekCloseTimer.current);
   }, [location.pathname]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    setUser(null);
-    setMenuOpen(false);
-    navigate("/");
-  };
+  useEffect(() => () => clearTimeout(peekCloseTimer.current), []);
 
+  // Returning to the top ends any peek, so the bar settles into its full
+  // form rather than staying stuck in "temporarily expanded".
   useEffect(() => {
-    setQuery("");
-    setResults([]);
-  }, [location.pathname]);
+    if (atTop) setPeek(false);
+  }, [atTop]);
 
-  const handleSearch = () => {
-    if (query.trim() !== "") {
-      navigate(`/search/${encodeURIComponent(query)}`);
-      setQuery("");
-      setResults([]);
-    }
-  };
-
+  // ⌘K / Ctrl+K / "/" open search, the convention users already know.
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
-
-    if (typingTimeout) clearTimeout(typingTimeout);
-
-    const timeout = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `https://api.themoviedb.org/3/search/multi?query=${query}&include_adult=false&language=en-US&page=1`,
-          {
-            method: "GET",
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
-            },
-          }
-        );
-        const data = await res.json();
-        setResults(data.results || []);
-      } catch (err) {
-        console.error("Search failed:", err);
-      }
-    }, 500);
-
-    setTypingTimeout(timeout);
-
-    return () => clearTimeout(timeout);
-  }, [query]);
-
-  const handleResultClick = (item) => {
-    setQuery("");
-    setResults([]);
-    setMenuOpen(false);
-    navigate(`/details/${item.media_type}/${item.id}`);
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setResults([]);
+    const onKeyDown = (e) => {
+      const tag = e.target.tagName;
+      const typing =
+        tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable;
+      if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || (e.key === "/" && !typing)) {
+        e.preventDefault();
+        setPaletteOpen(true);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  return (
-    <nav className='navbar'>
-      <div className='nav-container'>
-        <div className='logo-section'>
-          <Link to='/' className='logo'>
-            <div className='logo-icon'>
-              <Video className='logo-video-icon' />
-            </div>
-            <h1 className='logo-text'>Goofy Tube</h1>
-          </Link>
-          <button
-            className='hamburger'
-            onClick={() => setMenuOpen((prev) => !prev)}
-            aria-label='Toggle menu'
-          >
-            <span className='bar'></span>
-            <span className='bar'></span>
-            <span className='bar'></span>
-          </button>
-        </div>
+  /* Compact = scrolled-down AND not currently being peeked at. Keeping these
+     separate means releasing a hover returns the bar to whatever the scroll
+     position implies, instead of latching open. */
+  const compact = collapsed && !peek;
 
-        <div className={`nav-items ${menuOpen ? "open" : ""}`}>
-          <div className='search-bar' ref={dropdownRef}>
-            <input
-              type='text'
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-              }}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              placeholder='Search...'
-              className='search-input'
-            />
-            {query && (
-              <button
-                className='clear-button'
-                onClick={() => {
-                  setQuery("");
-                  setResults([]);
-                }}
-                aria-label='Clear search'
+  const linkClass = ({ isActive }) =>
+    `rounded-full px-4 py-1.5 text-caption font-medium transition duration-150 ${
+      isActive ? "bg-white/8 text-ink" : "text-muted hover:text-ink"
+    }`;
+
+  return (
+    <>
+      {/*
+        The bar is sticky and its height never changes, so collapsing is a
+        pure transform/width transition — the page below never reflows and
+        CLS stays at zero.
+
+        `compact` is the visual state; a peek (hover/focus/tap) overrides the
+        collapse without touching the scroll state, so letting go returns it
+        to whatever scrolling decided.
+      */}
+      <div className="sticky top-0 z-50 px-3 pt-3 md:px-6 md:pt-4">
+        <header
+          onMouseEnter={() => {
+            clearTimeout(peekCloseTimer.current);
+            setPeek(true);
+          }}
+          onMouseLeave={() => {
+            clearTimeout(peekCloseTimer.current);
+            peekCloseTimer.current = setTimeout(() => setPeek(false), 160);
+          }}
+          onFocusCapture={() => setPeek(true)}
+          onBlurCapture={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget)) setPeek(false);
+          }}
+          onClick={() => compact && setPeek(true)}
+          data-compact={compact}
+          className={`mx-auto flex h-14 items-center gap-3 rounded-full border
+                      border-hairline bg-surface/80 px-3 backdrop-blur-xl md:px-5
+                      ${compact ? "max-w-[560px] shadow-[0_8px_30px_-8px_rgba(0,0,0,0.7)]" : "max-w-[1600px]"}`}
+          style={{
+            transition: reduced
+              ? "none"
+              : `max-width 650ms var(--ease-emphasis),
+                 box-shadow 500ms var(--ease-out-soft)`,
+          }}
+        >
+          <Link
+            to="/"
+            className="shrink-0 text-[0.9rem] font-extrabold uppercase tracking-[0.14em] text-ink"
+            aria-label="Goofy Tube home"
+          >
+            Goofy<span className="text-accent">Tube</span>
+          </Link>
+
+          {/* Centre nav — desktop only */}
+          {/*
+            Links collapse to zero width rather than unmounting, so keyboard
+            focus order is preserved and there's no remount cost. They're
+            aria-hidden and untabbable while hidden.
+          */}
+          <nav
+            className="mx-auto hidden items-center gap-1 overflow-hidden md:flex"
+            aria-hidden={compact}
+            style={{
+              maxWidth: compact ? 0 : 400,
+              opacity: compact ? 0 : 1,
+              transition: reduced
+                ? "none"
+                : `max-width 600ms var(--ease-emphasis),
+                   opacity 420ms var(--ease-out-soft)`,
+            }}
+          >
+            {NAV_LINKS.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.end}
+                tabIndex={compact ? -1 : 0}
+                className={linkClass}
               >
-                <X size={18} />
-              </button>
-            )}
-            <button className='search-button' onClick={handleSearch}>
-              <Search size={18} />
+                {link.label}
+              </NavLink>
+            ))}
+          </nav>
+
+          <div className="ml-auto flex items-center gap-2 md:ml-0">
+            <button
+              onClick={() => setPaletteOpen(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2
+                         text-caption font-semibold text-white transition duration-200
+                         hover:bg-accent-hover"
+            >
+              <Search size={15} aria-hidden="true" />
+              <span className="hidden sm:inline">Browse</span>
             </button>
 
-            {results.length > 0 && (
-              <ul className='search-results'>
-                {results.slice(0, 6).map((item) => (
-                  <li
-                    key={`${item.media_type}-${item.id}`}
-                    className='search-result-item'
-                    onClick={() => handleResultClick(item)}
-                  >
-                    <img
-                      className='search-result-img'
-                      src={
-                        item.poster_path || item.profile_path
-                          ? `https://image.tmdb.org/t/p/w92${
-                              item.poster_path || item.profile_path
-                            }`
-                          : "https://via.placeholder.com/40x60?text=No+Image"
-                      }
-                      alt={item.title || item.name}
-                    />
-                    <span>{item.title || item.name}</span>
-                  </li>
-                ))}
-              </ul>
+            {user ? (
+              <Link
+                to="/profile"
+                aria-label={`Open ${user.name || "your"} profile`}
+                className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-hairline bg-accent text-caption font-semibold text-white transition duration-300 hover:border-hairline-strong focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                {user.profileImage ? (
+                  <img src={user.profileImage} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span aria-hidden="true">{(user.name || "?").charAt(0).toUpperCase()}</span>
+                )}
+              </Link>
+            ) : (
+              <Link
+                to="/signin"
+                className="hidden items-center gap-1.5 rounded-full border border-hairline
+                           px-4 py-2 text-caption font-medium text-muted transition
+                           hover:border-hairline-strong hover:text-ink sm:flex"
+              >
+                <LogIn size={15} aria-hidden="true" />
+                Sign In
+              </Link>
+            )}
+
+            <button
+              onClick={() => setMobileOpen((v) => !v)}
+              aria-label="Toggle menu"
+              aria-expanded={mobileOpen}
+              className="flex h-9 w-9 items-center justify-center rounded-full
+                         text-muted transition hover:text-ink md:hidden"
+            >
+              {mobileOpen ? (
+                <X size={18} aria-hidden="true" />
+              ) : (
+                <Menu size={18} aria-hidden="true" />
+              )}
+            </button>
+          </div>
+        </header>
+
+        {/* Mobile nav sheet */}
+        {mobileOpen && (
+          <div className="animate-fade-up mt-2 overflow-hidden rounded-sheet border border-hairline bg-surface/95 backdrop-blur-xl md:hidden">
+            {NAV_LINKS.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.end}
+                className="block border-b border-hairline px-4 py-3 text-caption text-muted last:border-0"
+              >
+                {link.label}
+              </NavLink>
+            ))}
+            {!user && (
+              <Link
+                to="/signin"
+                className="block px-4 py-3 text-caption font-medium text-ink"
+              >
+                Sign In
+              </Link>
+            )}
+            {user && (
+              <Link to="/profile" className="block px-4 py-3 text-caption font-medium text-ink">
+                Profile
+              </Link>
             )}
           </div>
-
-          {user ? (
-            <div className='profile-dropdown'>
-              <div className='profile-details'>
-                <div className='profile'>
-                  <img
-                    src='https://images.pexels.com/photos/1130626/pexels-photo-1130626.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1'
-                    alt={user.name}
-                    className='profile-image'
-                  />
-                </div>
-                <span className='profile-name'>{user.name}</span>
-              </div>
-              <div className='dropdown-menu'>
-                <button className='dropdown-item' onClick={handleLogout}>
-                  Logout
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className='auth-buttons'>
-              <Link
-                to='/signin'
-                onClick={() => setMenuOpen(false)}
-                className='auth-button'
-              >
-                <LogIn size={18} />
-                <span>Sign In</span>
-              </Link>
-              <Link
-                to='/signup'
-                onClick={() => setMenuOpen(false)}
-                className='auth-button signup'
-              >
-                <User size={18} />
-                <span>Sign Up</span>
-              </Link>
-            </div>
-          )}
-        </div>
+        )}
       </div>
-    </nav>
+
+      <SearchPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+    </>
   );
 };
 

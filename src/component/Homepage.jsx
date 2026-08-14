@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from "react";
-import "./homepage.css";
+import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   setPopular,
@@ -9,18 +8,11 @@ import {
   setLoading,
   setError,
 } from "../redux/slices/movieSlice";
-import { Link } from "react-router-dom";
 import HeroCarousel from "./HeroCarousel";
-import { ChevronLeftIcon, ChevronRightIcon, Filter } from "lucide-react";
 import GenreFilter from "./GenreFilter";
+import MediaRail from "./MediaRail";
 
 const API_BASE_URL = "https://api.themoviedb.org/3";
-
-const Loader = () => (
-  <div className='loader-wrapper'>
-    <div className='spinner'></div>
-  </div>
-);
 
 const Homepage = () => {
   const dispatch = useDispatch();
@@ -30,371 +22,152 @@ const Homepage = () => {
     tvPopular,
     tvTopRated,
     isLoading,
-    selectedGenre,
+    error,
+    selectedGenreId,
     selectedGenreType,
   } = useSelector((state) => state.movies);
-  const [scrolledSections, setScrolledSections] = useState({});
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchMovies = async () => {
       dispatch(setLoading(true));
+      dispatch(setError(null));
 
-      const headers = {
+      const options = {
         method: "GET",
+        signal: controller.signal,
         headers: {
           accept: "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
         },
       };
 
+      // A genre filter only applies to the section it belongs to. Previously
+      // picking a TV genre left the movie rows showing unfiltered "popular"
+      // with no indication why.
+      const movieFilter =
+        selectedGenreId && selectedGenreType === "movie"
+          ? `&with_genres=${selectedGenreId}`
+          : null;
+      const tvFilter =
+        selectedGenreId && selectedGenreType === "tv"
+          ? `&with_genres=${selectedGenreId}`
+          : null;
+
+      const urls = [
+        movieFilter
+          ? `${API_BASE_URL}/discover/movie?language=en-US&page=1${movieFilter}`
+          : `${API_BASE_URL}/movie/popular?language=en-US&page=1`,
+        movieFilter
+          ? `${API_BASE_URL}/discover/movie?language=en-US&page=1&sort_by=vote_average.desc&vote_count.gte=200${movieFilter}`
+          : `${API_BASE_URL}/movie/top_rated?language=en-US&page=1`,
+        tvFilter
+          ? `${API_BASE_URL}/discover/tv?language=en-US&page=1${tvFilter}`
+          : `${API_BASE_URL}/tv/popular?language=en-US&page=1`,
+        tvFilter
+          ? `${API_BASE_URL}/discover/tv?language=en-US&page=1&sort_by=vote_average.desc&vote_count.gte=200${tvFilter}`
+          : `${API_BASE_URL}/tv/top_rated?language=en-US&page=1`,
+      ];
+
+      const setters = [setPopular, setTopRated, setTVPopular, setTVTopRated];
+
       try {
-        const [popularRes, topRatedRes, tvPopularRes, tvTopRatedRes] =
-          await Promise.allSettled([
-            fetch(
-              selectedGenre && selectedGenreType === "movie"
-                ? `${API_BASE_URL}/discover/movie?language=en-US&page=1&with_genres=${selectedGenre}`
-                : `${API_BASE_URL}/movie/popular?language=en-US&page=1`,
-              headers
-            ),
-            fetch(
-              selectedGenre && selectedGenreType === "movie"
-                ? `${API_BASE_URL}/discover/movie?language=en-US&page=1&sort_by=vote_average.desc&with_genres=${selectedGenre}`
-                : `${API_BASE_URL}/movie/top_rated?language=en-US&page=1`,
-              headers
-            ),
-            fetch(
-              selectedGenre && selectedGenreType === "tv"
-                ? `${API_BASE_URL}/discover/tv?language=en-US&page=1&with_genres=${selectedGenre}`
-                : `${API_BASE_URL}/tv/popular?language=en-US&page=1`,
-              headers
-            ),
-            fetch(
-              selectedGenre && selectedGenreType === "tv"
-                ? `${API_BASE_URL}/discover/tv?language=en-US&page=1&sort_by=vote_average.desc&with_genres=${selectedGenre}`
-                : `${API_BASE_URL}/tv/top_rated?language=en-US&page=1`,
-              headers
-            ),
-          ]);
+        const settled = await Promise.allSettled(
+          urls.map((url) => fetch(url, options).then((r) => r.json()))
+        );
+        if (controller.signal.aborted) return;
 
-        if (popularRes.status === "fulfilled") {
-          const data = await popularRes.value.json();
-          dispatch(setPopular(data.results || []));
-        } else {
-          dispatch(setPopular([]));
-        }
+        settled.forEach((result, i) => {
+          dispatch(
+            setters[i](
+              result.status === "fulfilled" ? result.value.results || [] : []
+            )
+          );
+        });
 
-        if (topRatedRes.status === "fulfilled") {
-          const data = await topRatedRes.value.json();
-          dispatch(setTopRated(data.results || []));
-        } else {
-          dispatch(setTopRated([]));
+        // Surface a message only when every request failed — a single flaky
+        // row shouldn't blank the page.
+        if (settled.every((r) => r.status === "rejected")) {
+          dispatch(setError("Couldn't reach the movie database."));
         }
-
-        if (tvPopularRes.status === "fulfilled") {
-          const data = await tvPopularRes.value.json();
-          dispatch(setTVPopular(data.results || []));
-        } else {
-          dispatch(setTVPopular([]));
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          dispatch(setError("Something went wrong while fetching data."));
         }
-
-        if (tvTopRatedRes.status === "fulfilled") {
-          const data = await tvTopRatedRes.value.json();
-          dispatch(setTVTopRated(data.results || []));
-        } else {
-          dispatch(setTVTopRated([]));
-        }
-      } catch (error) {
-        dispatch(setError("Something went wrong while fetching data."));
       } finally {
-        dispatch(setLoading(false));
-        document.getElementById("loader")?.classList.add("fade-out");
-        setTimeout(() => {
-          const loader = document.getElementById("loader");
-          if (loader) loader.remove();
-        }, 800);
+        // The boot loader is owned solely by main.jsx — see hideBootLoader().
+        if (!controller.signal.aborted) dispatch(setLoading(false));
       }
     };
 
     fetchMovies();
-  }, [dispatch, selectedGenre, selectedGenreType]);
+    return () => controller.abort();
+  }, [dispatch, selectedGenreId, selectedGenreType]);
 
-  const scrollLeft = (id) => {
-    const container = document.getElementById(id);
-    if (container) {
-      container.scrollBy({
-        left: -container.offsetWidth,
-        behavior: "smooth",
-      });
-
-      setTimeout(() => {
-        const isAtStart = container.scrollLeft - container.offsetWidth <= 0;
-        setScrolledSections((prev) => ({
-          ...prev,
-          [id]: !isAtStart,
-        }));
-      }, 400);
-    }
-  };
-
-  const scrollRight = (id) => {
-    const container = document.getElementById(id);
-    if (container) {
-      container.scrollBy({
-        left: container.offsetWidth,
-        behavior: "smooth",
-      });
-
-      setScrolledSections((prev) => ({
-        ...prev,
-        [id]: true,
-      }));
-    }
-  };
+  const filterLabel = selectedGenreId
+    ? selectedGenreType === "tv"
+      ? "TV Shows"
+      : "Movies"
+    : null;
 
   return (
-    <div className='homepage-container'>
-      <div className='homepage-header'>
-        <h1>Welcome to Goofy Tube</h1>
-        <p>
-          Explore the latest popular and top-rated movies and TV shows here!
-        </p>
-      </div>
+    <main>
       <HeroCarousel />
 
-      {isLoading ? (
-        <Loader />
+      <GenreFilter />
+
+      {error ? (
+        <div className="px-4 py-20 text-center md:px-10">
+          <h2 className="text-h2 text-ink">Can&rsquo;t load titles</h2>
+          <p className="mt-2 text-body text-muted">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 rounded-full bg-ink px-6 py-2.5 text-sm font-semibold text-ink-invert transition hover:bg-white"
+          >
+            Retry
+          </button>
+        </div>
       ) : (
-        <>
-          <div className='global-genre-filter'>
-            <GenreFilter type='movie' />
-          </div>
-          {/* POPULAR MOVIES */}
-          {popular.length > 0 && (
-            <div className='movie-section'>
-              <h1>Popular Movies</h1>
-              <div className='carousel-wrapper'>
-                {scrolledSections["popular"] && (
-                  <button
-                    className='carousel-btn prev'
-                    onClick={() => scrollLeft("popular")}
-                  >
-                    <ChevronLeftIcon />
-                  </button>
-                )}
-                <div className='movie-grid' id='popular'>
-                  {popular.map((movie) => (
-                    <Link
-                      to={`/details/movie/${movie.id}`}
-                      className='movie-card'
-                      key={movie.id}
-                    >
-                      <img
-                        src={
-                          movie.poster_path
-                            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-                            : ""
-                        }
-                        alt={movie.title}
-                      />
-                      <div className='movie-overlay'>
-                        <h3>{movie.title}</h3>
-                        <p>Rating: {movie.vote_average}</p>
-                        <p>
-                          Released:{" "}
-                          {movie.release_date &&
-                            new Date(movie.release_date).toLocaleDateString(
-                              "en-US",
-                              {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              }
-                            )}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-                <button
-                  className='carousel-btn next'
-                  onClick={() => scrollRight("popular")}
-                >
-                  <ChevronRightIcon />
-                </button>
-              </div>
-            </div>
+        <div className="pb-8">
+          {/* When a genre filter is active, only the matching media type has
+              meaningfully filtered results, so the other pair is suppressed
+              rather than shown as unfiltered defaults. */}
+          {(!filterLabel || filterLabel === "Movies") && (
+            <>
+              <MediaRail
+                title="Popular Movies"
+                items={popular}
+                fallbackType="movie"
+                loading={isLoading}
+              />
+              <MediaRail
+                title="Top Rated Movies"
+                items={topRated}
+                fallbackType="movie"
+                loading={isLoading}
+              />
+            </>
           )}
-          {/* TOP RATED MOVIES */}
-          {topRated.length > 0 && (
-            <div className='movie-section'>
-              <h1>Top Rated Movies</h1>
-              <div className='carousel-wrapper'>
-                {scrolledSections["topRated"] && (
-                  <button
-                    className='carousel-btn prev'
-                    onClick={() => scrollLeft("topRated")}
-                  >
-                    <ChevronLeftIcon />
-                  </button>
-                )}
-                <div className='movie-grid' id='topRated'>
-                  {topRated.map((movie) => (
-                    <Link
-                      to={`/details/movie/${movie.id}`}
-                      className='movie-card'
-                      key={movie.id}
-                    >
-                      <img
-                        src={
-                          movie.poster_path
-                            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-                            : ""
-                        }
-                        alt={movie.title}
-                      />
-                      <div className='movie-overlay'>
-                        <h3>{movie.title}</h3>
-                        <p>Rating: {movie.vote_average}</p>
-                        <p>
-                          Released:{" "}
-                          {movie.release_date &&
-                            new Date(movie.release_date).toLocaleDateString(
-                              "en-US",
-                              {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              }
-                            )}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-                <button
-                  className='carousel-btn next'
-                  onClick={() => scrollRight("topRated")}
-                >
-                  <ChevronRightIcon />
-                </button>
-              </div>
-            </div>
+          {(!filterLabel || filterLabel === "TV Shows") && (
+            <>
+              <MediaRail
+                title="Popular TV Shows"
+                items={tvPopular}
+                fallbackType="tv"
+                loading={isLoading}
+              />
+              <MediaRail
+                title="Top Rated TV Shows"
+                items={tvTopRated}
+                fallbackType="tv"
+                loading={isLoading}
+              />
+            </>
           )}
-          {/* POPULAR TV SHOWS */}
-          {tvPopular.length > 0 && (
-            <div className='movie-section'>
-              <h1>Popular TV Shows</h1>
-              <div className='carousel-wrapper'>
-                {scrolledSections["tvPopular"] && (
-                  <button
-                    className='carousel-btn prev'
-                    onClick={() => scrollLeft("tvPopular")}
-                  >
-                    <ChevronLeftIcon />
-                  </button>
-                )}
-                <div className='movie-grid' id='tvPopular'>
-                  {tvPopular.map((show) => (
-                    <Link
-                      to={`/details/tv/${show.id}`}
-                      className='movie-card'
-                      key={show.id}
-                    >
-                      <img
-                        src={
-                          show.poster_path
-                            ? `https://image.tmdb.org/t/p/w500${show.poster_path}`
-                            : ""
-                        }
-                        alt={show.name}
-                      />
-                      <div className='movie-overlay'>
-                        <h3>{show.name}</h3>
-                        <p>Rating: {show.vote_average}</p>
-                        <p>
-                          Released:{" "}
-                          {show.first_air_date &&
-                            new Date(show.first_air_date).toLocaleDateString(
-                              "en-US",
-                              {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              }
-                            )}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-                <button
-                  className='carousel-btn next'
-                  onClick={() => scrollRight("tvPopular")}
-                >
-                  <ChevronRightIcon />
-                </button>
-              </div>
-            </div>
-          )}
-          {/* TOP RATED TV SHOWS */}
-          {tvTopRated.length > 0 && (
-            <div className='movie-section'>
-              <h1>Top Rated TV Shows</h1>
-              <div className='carousel-wrapper'>
-                {scrolledSections["tvTopRated"] && (
-                  <button
-                    className='carousel-btn prev'
-                    onClick={() => scrollLeft("tvTopRated")}
-                  >
-                    <ChevronLeftIcon />
-                  </button>
-                )}
-                <div className='movie-grid' id='tvTopRated'>
-                  {tvTopRated.map((show) => (
-                    <Link
-                      to={`/details/tv/${show.id}`}
-                      className='movie-card'
-                      key={show.id}
-                    >
-                      <img
-                        src={
-                          show.poster_path
-                            ? `https://image.tmdb.org/t/p/w500${show.poster_path}`
-                            : ""
-                        }
-                        alt={show.name}
-                      />
-                      <div className='movie-overlay'>
-                        <h3>{show.name}</h3>
-                        <p>Rating: {show.vote_average}</p>
-                        <p>
-                          Released:{" "}
-                          {show.first_air_date &&
-                            new Date(show.first_air_date).toLocaleDateString(
-                              "en-US",
-                              {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              }
-                            )}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-                <button
-                  className='carousel-btn next'
-                  onClick={() => scrollRight("tvTopRated")}
-                >
-                  <ChevronRightIcon />
-                </button>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
-    </div>
+    </main>
   );
 };
 

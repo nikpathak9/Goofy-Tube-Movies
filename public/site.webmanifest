@@ -1,0 +1,27 @@
+{
+  "name": "Goofy Tube",
+  "short_name": "GoofyTube",
+  "description": "Browse popular and top-rated movies and TV shows, and watch trailers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050507",
+  "theme_color": "#0d0d10",
+  "icons": [
+    {
+      "src": "/favicon-96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Lock, Mail } from "lucide-react";
-import "./auth.css";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Lock, Mail, AlertCircle } from "lucide-react";
+import AuthLayout, { AuthField } from "./AuthLayout";
+import { useAuth } from "../lib/useAuth";
 
 const SignIn = () => {
   const [email, setEmail] = useState("");
@@ -9,6 +10,11 @@ const SignIn = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { setUser } = useAuth();
+  const returnTo = typeof location.state?.from === "string" && location.state.from.startsWith("/")
+    ? location.state.from
+    : "/";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,12 +22,11 @@ const SignIn = () => {
     setError("");
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
-      const users = JSON.parse(localStorage.getItem("users")) || [];
-
+      const users = JSON.parse(localStorage.getItem("users") || "[]");
       const matchedUser = users.find(
-        (u) => u.email === email && u.password === password
+        (u) => u.email === email.trim() && u.password === password
       );
 
       if (!matchedUser) {
@@ -29,10 +34,9 @@ const SignIn = () => {
         return;
       }
 
-      // Set current logged-in user
-      localStorage.setItem("user", JSON.stringify(matchedUser));
-      navigate("/");
-    } catch (err) {
+      setUser(matchedUser);
+      navigate(returnTo, { replace: true });
+    } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
@@ -40,52 +44,73 @@ const SignIn = () => {
   };
 
   return (
-    <div className='auth-container'>
-      <div className='auth-card'>
-        <Link to='/' className='back-button-auth'>
-          <ArrowLeft size={18} /> <span>Back</span>
-        </Link>
-        <h2 className='auth-title'>Sign In</h2>
-        {error && <p className='auth-error'>{error}</p>}
-
-        <form onSubmit={handleSubmit} className='auth-form'>
-          <div className='input-group'>
-            <Mail className='input-icon' />
-            <input
-              type='email'
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder='Email'
-              required
-              className='auth-input'
-            />
-          </div>
-
-          <div className='input-group'>
-            <Lock className='input-icon' />
-            <input
-              type='password'
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder='Password'
-              required
-              className='auth-input'
-            />
-          </div>
-
-          <button type='submit' className='auth-button' disabled={loading}>
-            {loading ? "Signing In..." : "Sign In"}
-          </button>
-        </form>
-
-        <p className='auth-switch'>
-          Don't have an account?{" "}
-          <Link to='/signup' className='auth-link'>
-            Sign Up
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Sign in to pick up where you left off."
+      footer={
+        <>
+          Don&rsquo;t have an account?{" "}
+          <Link
+            to="/signup"
+            state={{ from: returnTo }}
+            className="font-medium text-accent transition hover:text-accent-hover"
+          >
+            Sign up
           </Link>
-        </p>
-      </div>
-    </div>
+        </>
+      }
+    >
+      {error && (
+        <div
+          role="alert"
+          className="mb-4 flex items-start gap-2 rounded-lg border border-accent/40
+                     bg-accent-soft px-3.5 py-2.5 text-caption text-accent-hover"
+        >
+          <AlertCircle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <AuthField
+          icon={Mail}
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          autoComplete="email"
+          required
+        />
+        <AuthField
+          icon={Lock}
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          autoComplete="current-password"
+          required
+        />
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="mt-2 w-full rounded-lg bg-accent py-2.5 text-sm font-semibold
+                     text-white transition duration-200 hover:bg-accent-hover
+                     disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? "Signing in..." : "Sign In"}
+        </button>
+      </form>
+
+      {/*
+        This is prototype auth: credentials live in localStorage in plaintext.
+        Saying so plainly is better than implying real account security.
+      */}
+      <p className="mt-4 text-[11px] leading-relaxed text-faint">
+        Demo accounts are stored locally in this browser only. Don&rsquo;t use a
+        real password.
+      </p>
+    </AuthLayout>
   );
 };
 

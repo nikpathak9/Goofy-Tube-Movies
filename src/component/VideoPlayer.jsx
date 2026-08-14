@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import "videojs-youtube";
@@ -6,15 +6,17 @@ import {
   Play,
   Pause,
   Volume2,
+  Volume1,
   VolumeX,
-  Maximize2,
-  Subtitles,
   ArrowLeft,
-  Minimize2,
   Expand,
   Minimize,
+  PictureInPicture2,
+  RotateCcw,
+  RotateCw,
+  AlertTriangle,
 } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   setPlaying,
@@ -22,414 +24,679 @@ import {
   setCurrentTime,
   setDuration,
 } from "../redux/slices/videoSlice";
-import "./video.css";
+import MediaRail from "./MediaRail";
+import { isPlayableType, titleOf } from "../lib/media";
+
+const CONTROLS_HIDE_DELAY = 3000;
+const SEEK_STEP = 10;
+
+function formatTime(seconds) {
+  if (!seconds || Number.isNaN(seconds)) return "0:00";
+  const total = Math.floor(seconds);
+  const hrs = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hrs > 0) {
+    return `${hrs}:${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  }
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
 
 const VideoPlayer = () => {
   const videoRef = useRef(null);
   const playerRef = useRef(null);
-  const [playerReady, setPlayerReady] = useState(false);
-
-  const { id, type } = useParams();
-  const [trailerUrl, setTrailerUrl] = useState(null);
-  const [mediaTitle, setMediaTitle] = useState("");
-  const [mediaOverview, setMediaOverview] = useState("");
-  const [mediaReleaseDate, setMediaReleaseDate] = useState("");
-  const [mediaRuntime, setMediaRuntime] = useState("");
-  const [mediaGenres, setMediaGenres] = useState([]);
-  const [recommendations, setRecommendations] = useState([]);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [controlsVisible, setControlsVisible] = useState(true);
+  const shellRef = useRef(null);
   const hideControlsTimer = useRef(null);
 
-  const showControlsTemporarily = () => {
-    setControlsVisible(true);
-    if (hideControlsTimer.current) {
-      clearTimeout(hideControlsTimer.current);
-    }
-
-    if (isPlaying) {
-      hideControlsTimer.current = setTimeout(() => {
-        setControlsVisible(false);
-      }, 1500);
-    }
-  };
-
+  const { id, type } = useParams();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const { isPlaying, isMuted, currentTime, duration } = useSelector(
     (state) => state.video
   );
+
+  const [trailerUrl, setTrailerUrl] = useState(null);
+  const [meta, setMeta] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [volume, setVolume] = useState(1);
+  const [buffered, setBuffered] = useState(0);
+  const [scrubbing, setScrubbing] = useState(false);
+
+  /*
+    `isPlaying` is mirrored into a ref because the controls auto-hide timer is
+    registered from Video.js event handlers that are bound once at init. The
+    original read `isPlaying` directly from the closure, so it was frozen at
+    its first-render value and auto-hide behaved unpredictably.
+  */
+  const isPlayingRef = useRef(isPlaying);
   useEffect(() => {
-    let isMounted = true;
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  const showControlsTemporarily = useCallback(() => {
+    setControlsVisible(true);
+    if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
+    if (isPlayingRef.current) {
+      hideControlsTimer.current = setTimeout(
+        () => setControlsVisible(false),
+        CONTROLS_HIDE_DELAY
+      );
+    }
+  }, []);
+
+  // ---- Data ---------------------------------------------------------------
+
+  useEffect(() => {
+    if (!isPlayableType(type)) {
+      setError("That address doesn't point to a movie or show.");
+      setIsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
 
     const fetchData = async () => {
-      try {
-        const [videoRes, metaRes] = await Promise.all([
-          fetch(
-            `https://api.themoviedb.org/3/${type}/${id}/videos?language=en-US`,
-            {
-              headers: {
-                accept: "application/json",
-                Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
-              },
-            }
-          ),
-          fetch(`https://api.themoviedb.org/3/${type}/${id}?language=en-US`, {
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
-            },
-          }),
-        ]);
-
-        const [videoData, metaData] = await Promise.all([
-          videoRes.json(),
-          metaRes.json(),
-        ]);
-
-        if (isMounted) {
-          const trailer = videoData.results?.find(
-            (vid) => vid.site === "YouTube" && vid.type === "Trailer"
-          );
-          if (trailer) {
-            setTrailerUrl(`https://www.youtube.com/watch?v=${trailer.key}`);
-          }
-          setMediaTitle(metaData.title || metaData.name);
-          setMediaOverview(metaData.overview || "");
-          setMediaReleaseDate(metaData.release_date || "");
-          setMediaRuntime(metaData.runtime || "");
-          setMediaGenres(metaData.genres || []);
-          setIsLoading(false);
-        }
-      } catch (err) {
-        console.error("Failed to fetch data", err);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    fetchData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [id, type]);
-
-  // Initialize video player
-  useEffect(() => {
-    if (!trailerUrl) return;
-
-    let player;
-    const initializePlayer = () => {
-      // Dispose previous player if exists
-      if (playerRef.current) {
-        playerRef.current.dispose();
-        playerRef.current = null;
-      }
-
-      player = videojs(videoRef.current, {
-        techOrder: ["youtube"],
-        autoplay: true,
-        muted: false,
-        controls: false,
-        fluid: true,
-        responsive: true,
-        loadingSpinner: false,
-        aspectRatio: "16:9",
-        sources: [
-          {
-            src: trailerUrl,
-            type: "video/youtube",
-          },
-        ],
-        youtube: {
-          ytControls: 0,
-          enablePrivacyEnhancedMode: true,
-        },
-      });
-
-      player.ready(() => {
-        setPlayerReady(true);
-        playerRef.current = player;
-        dispatch(setDuration(player.duration() || 0));
-      });
-
-      player.on("loadedmetadata", () => {
-        dispatch(setDuration(player.duration() || 0));
-      });
-
-      player.on("timeupdate", () => {
-        dispatch(setCurrentTime(player.currentTime() || 0));
-      });
-
-      player.on("play", () => {
-        dispatch(setPlaying(true));
-      });
-
-      player.on("pause", () => {
-        dispatch(setPlaying(false));
-      });
-
-      player.on("volumechange", () => {
-        dispatch(setMuted(player.muted()));
-      });
-
-      player.on("error", () => {
-        console.error("Video player error");
-        setIsLoading(false);
-      });
-
-      player.on("fullscreenchange", () => {
-        showControlsTemporarily();
-      });
-    };
-
-    // Add slight delay to ensure DOM is ready
-    const timer = setTimeout(initializePlayer, 100);
-
-    return () => {
-      clearTimeout(timer);
-      if (player) {
-        player.dispose();
-      }
-    };
-  }, [trailerUrl, dispatch]);
-
-  useEffect(() => {
-    const fetchRecommendations = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
         const res = await fetch(
-          `https://api.themoviedb.org/3/${type}/${id}/recommendations?language=en-US&page=1`,
+          `https://api.themoviedb.org/3/${type}/${id}?language=en-US&append_to_response=videos,recommendations`,
           {
+            signal: controller.signal,
             headers: {
               accept: "application/json",
               Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
             },
           }
         );
+        if (!res.ok) throw new Error(`TMDB responded ${res.status}`);
         const data = await res.json();
-        setRecommendations(data.results || []);
+        if (controller.signal.aborted) return;
+
+        const trailer =
+          data.videos?.results?.find(
+            (v) => v.site === "YouTube" && v.type === "Trailer" && v.key
+          ) ||
+          data.videos?.results?.find((v) => v.site === "YouTube" && v.key);
+
+        setMeta(data);
+        const seenRecommendationIds = new Set([String(id)]);
+        setRecommendations(
+          (data.recommendations?.results || [])
+            .filter(
+              (item) =>
+                item?.id &&
+                !seenRecommendationIds.has(String(item.id)) &&
+                seenRecommendationIds.add(String(item.id))
+            )
+            .slice(0, 40)
+        );
+        setTrailerUrl(
+          trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null
+        );
       } catch (err) {
-        console.error("Failed to fetch recommendations:", err);
+        if (err.name !== "AbortError") {
+          console.error("Failed to fetch data", err);
+          setError("Couldn't load this trailer. Please try again.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     };
 
-    fetchRecommendations();
+    fetchData();
+    return () => controller.abort();
   }, [id, type]);
 
-  // Handle player source change
-  useEffect(() => {
-    if (playerReady && playerRef.current && trailerUrl) {
-      playerRef.current.src({ type: "video/youtube", src: trailerUrl });
-    }
-  }, [trailerUrl, playerReady]);
+  // ---- Player lifecycle ---------------------------------------------------
 
+  /*
+    Initialised synchronously against a freshly-created <video> node.
+
+    The original wrapped this in setTimeout(…, 100) and disposed the player in
+    two places (the effect cleanup AND the top of init), which raced under
+    StrictMode's double-invoked effects and produced intermittent
+    "player was disposed" errors. There is now exactly one owner and no timer.
+  */
   useEffect(() => {
-    return () => {
-      if (hideControlsTimer.current) {
-        clearTimeout(hideControlsTimer.current);
-      }
+    if (!trailerUrl || !videoRef.current) return;
+
+    // Captured for the cleanup closure — videoRef.current may have changed
+    // by the time cleanup runs.
+    const mount = videoRef.current;
+
+    const videoEl = document.createElement("video");
+    videoEl.className =
+      "video-js vjs-default-skin video-element vjs-big-play-centered";
+    videoEl.playsInline = true;
+    mount.appendChild(videoEl);
+
+    const player = videojs(videoEl, {
+      techOrder: ["youtube"],
+      autoplay: true,
+      muted: false,
+      controls: false,
+      // `fill` makes Video.js size itself to its container instead of its
+      // built-in 300x150. The CSS in index.css under `.gt-stage` backs this
+      // up for the YouTube iframe, which Video.js doesn't size for us.
+      fluid: false,
+      fill: true,
+      responsive: true,
+      loadingSpinner: false,
+      sources: [{ src: trailerUrl, type: "video/youtube" }],
+      youtube: {
+        ytControls: 0,
+        enablePrivacyEnhancedMode: true,
+        modestbranding: 1,
+        rel: 0,
+      },
+    });
+
+    playerRef.current = player;
+
+    const syncDuration = () => {
+      const d = player.duration();
+      if (d && !Number.isNaN(d)) dispatch(setDuration(d));
     };
+
+    player.ready(() => {
+      syncDuration();
+      setVolume(player.volume());
+    });
+
+    /*
+      With the YouTube tech, duration() returns 0 until playback actually
+      begins, which left the seek bar dead (max={duration || 0}) for the first
+      seconds. Polling until it resolves fixes the scrub bar on load.
+    */
+    const durationPoll = setInterval(() => {
+      const d = player.duration();
+      if (d && !Number.isNaN(d)) {
+        dispatch(setDuration(d));
+        clearInterval(durationPoll);
+      }
+    }, 400);
+
+    player.on("loadedmetadata", syncDuration);
+    player.on("durationchange", syncDuration);
+    player.on("timeupdate", () => {
+      dispatch(setCurrentTime(player.currentTime() || 0));
+    });
+    player.on("progress", () => {
+      try {
+        const b = player.buffered();
+        if (b?.length) setBuffered(b.end(b.length - 1));
+      } catch {
+        // Some techs throw when buffered() is queried too early.
+      }
+    });
+    player.on("play", () => {
+      dispatch(setPlaying(true));
+      showControlsTemporarily();
+    });
+    player.on("pause", () => {
+      dispatch(setPlaying(false));
+      setControlsVisible(true);
+    });
+    player.on("volumechange", () => {
+      dispatch(setMuted(player.muted()));
+      setVolume(player.volume());
+    });
+    player.on("error", () => {
+      console.error("Video player error", player.error());
+      setError("This trailer failed to play.");
+      setIsLoading(false);
+    });
+
+    return () => {
+      clearInterval(durationPoll);
+      playerRef.current = null;
+      if (!player.isDisposed()) player.dispose();
+      // Video.js replaces the element it's given; clear whatever remains.
+      if (mount) mount.innerHTML = "";
+    };
+  }, [trailerUrl, dispatch, showControlsTemporarily]);
+
+  // ---- Fullscreen ---------------------------------------------------------
+
+  /*
+    Derived from the browser's own fullscreenchange event rather than toggled
+    by hand. Pressing Esc previously left the icon showing "minimize" forever.
+  */
+  useEffect(() => {
+    const onChange = () => {
+      const active = Boolean(
+        document.fullscreenElement || document.webkitFullscreenElement
+      );
+      setIsFullScreen(active);
+      showControlsTemporarily();
+    };
+    const events = ["fullscreenchange", "webkitfullscreenchange"];
+    events.forEach((e) => document.addEventListener(e, onChange));
+    return () => events.forEach((e) => document.removeEventListener(e, onChange));
+  }, [showControlsTemporarily]);
+
+  const toggleFullscreen = useCallback(() => {
+    const el = shellRef.current;
+    if (!el) return;
+    const active =
+      document.fullscreenElement || document.webkitFullscreenElement;
+    if (active) {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(
+        document
+      );
+    } else {
+      (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+    }
   }, []);
 
-  const togglePlay = () => {
-    if (playerRef.current) {
-      isPlaying ? playerRef.current.pause() : playerRef.current.play();
-    }
-  };
+  // ---- Controls -----------------------------------------------------------
 
-  const toggleMute = () => {
-    if (playerRef.current) {
-      const newMuted = !playerRef.current.muted();
-      playerRef.current.muted(newMuted);
-      dispatch(setMuted(newMuted));
-    }
-  };
+  const togglePlay = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) return;
+    if (player.paused()) player.play()?.catch(() => {});
+    else player.pause();
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) return;
+    player.muted(!player.muted());
+  }, []);
+
+  const seekBy = useCallback((delta) => {
+    const player = playerRef.current;
+    if (!player) return;
+    const next = Math.max(
+      0,
+      Math.min(player.duration() || 0, (player.currentTime() || 0) + delta)
+    );
+    player.currentTime(next);
+  }, []);
+
+  const changeVolume = useCallback((value) => {
+    const player = playerRef.current;
+    if (!player) return;
+    player.volume(value);
+    if (value > 0 && player.muted()) player.muted(false);
+    setVolume(value);
+  }, []);
 
   const handleSeek = (e) => {
     const time = parseFloat(e.target.value);
-    if (playerRef.current) {
-      playerRef.current.currentTime(time);
-      dispatch(setCurrentTime(time));
+    dispatch(setCurrentTime(time));
+    if (playerRef.current) playerRef.current.currentTime(time);
+  };
+
+  const togglePiP = useCallback(async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        return;
+      }
+      const el = playerRef.current?.el()?.querySelector("video");
+      if (el?.requestPictureInPicture) await el.requestPictureInPicture();
+    } catch {
+      // PiP isn't available for YouTube iframes in most browsers; ignore.
     }
+  }, []);
+
+  // Keyboard shortcuts, the standard set every video site implements.
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) {
+        return;
+      }
+      const handled = {
+        " ": togglePlay,
+        k: togglePlay,
+        f: toggleFullscreen,
+        m: toggleMute,
+        ArrowLeft: () => seekBy(-SEEK_STEP),
+        ArrowRight: () => seekBy(SEEK_STEP),
+        j: () => seekBy(-SEEK_STEP),
+        l: () => seekBy(SEEK_STEP),
+        ArrowUp: () => changeVolume(Math.min(1, volume + 0.1)),
+        ArrowDown: () => changeVolume(Math.max(0, volume - 0.1)),
+      }[e.key];
+
+      if (handled) {
+        e.preventDefault();
+        handled();
+        showControlsTemporarily();
+        return;
+      }
+
+      if (/^[0-9]$/.test(e.key) && playerRef.current) {
+        e.preventDefault();
+        const d = playerRef.current.duration();
+        if (d) playerRef.current.currentTime((parseInt(e.key, 10) / 10) * d);
+        showControlsTemporarily();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    togglePlay,
+    toggleFullscreen,
+    toggleMute,
+    seekBy,
+    changeVolume,
+    volume,
+    showControlsTemporarily,
+  ]);
+
+  useEffect(
+    () => () => {
+      if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
+    },
+    []
+  );
+
+  const handleBack = () => {
+    if (window.history.state?.idx > 0) navigate(-1);
+    else navigate("/");
   };
 
-  const formatTime = (seconds) => {
-    if (!seconds || isNaN(seconds)) return "0:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
+  const progressPercent = duration ? (currentTime / duration) * 100 : 0;
+  const bufferedPercent = duration ? (buffered / duration) * 100 : 0;
+  const title = meta ? titleOf(meta) : "";
 
-  if (!trailerUrl && !isLoading) {
-    return <div className='video-player-container'>No trailer available</div>;
+  // ---- Render -------------------------------------------------------------
+
+  if (!isLoading && (error || !trailerUrl)) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-base px-4 text-center">
+        <AlertTriangle size={36} className="text-faint" aria-hidden="true" />
+        <h1 className="mt-5 text-h1 text-ink">
+          {error ? "Playback problem" : "No trailer available"}
+        </h1>
+        <p className="mt-2 max-w-sm text-body text-muted">
+          {error ?? `We couldn't find a trailer for ${title || "this title"}.`}
+        </p>
+        <div className="mt-7 flex flex-wrap justify-center gap-3">
+          <button
+            onClick={() => navigate(`/details/${type}/${id}`)}
+            className="rounded-full bg-ink px-6 py-2.5 text-sm font-semibold text-ink-invert transition hover:bg-white"
+          >
+            View details
+          </button>
+          <button
+            onClick={handleBack}
+            className="rounded-full border border-hairline px-6 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-2"
+          >
+            Go back
+          </button>
+        </div>
+      </div>
+    );
   }
 
+  const controlsShown = controlsVisible || !isPlaying;
+
+  /*
+    The player used to be a full-bleed 16:9 stage at up to 100svh with the
+    navbar and footer hidden, which made every trailer look like it had
+    force-entered fullscreen. It's now a contained theatre inside the page
+    frame; real fullscreen is an explicit action, and only then do the
+    max-width, rounding and aspect ratio drop away.
+  */
+  const stageClass = isFullScreen
+    ? "gt-stage fixed inset-0 z-[100] h-screen w-screen rounded-none bg-black"
+    : "gt-stage relative aspect-video w-full overflow-clip rounded-sheet bg-black ring-1 ring-hairline";
+
   return (
-    <div className='video-player-container'>
-      <main className='main-content'>
-        <div className='content-wrapper'>
-          <div className='video-section'>
+    <main className="px-4 py-6 md:px-10 md:py-8">
+      <div className="mx-auto max-w-[1200px]">
+        {!isFullScreen && (
+          <div className="mb-5 flex items-center justify-between gap-4">
             <button
-              onClick={() => window.history.back()}
-              className='back-button'
+              onClick={handleBack}
+              className="inline-flex items-center gap-2 text-caption text-muted transition hover:text-ink"
             >
-              <ArrowLeft /> <span>Back</span>
+              <ArrowLeft size={15} aria-hidden="true" /> Back
             </button>
-            <div className='video-and-info'>
-              <div className='video-container'>
-                <div
-                  className='video-wrapper'
-                  onMouseMove={showControlsTemporarily}
-                  onClick={showControlsTemporarily}
-                  onTouchStart={showControlsTemporarily}
-                >
-                  <div data-vjs-player className='player-wrapper'>
-                    <video
-                      ref={videoRef}
-                      className='video-js vjs-default-skin video-element vjs-big-play-centered'
-                      playsInline
-                    />
-                    {isLoading && (
-                      <div className='loading-spinner'>
-                        <div className='spinner'></div>
-                      </div>
-                    )}
-                    <div
-                      className={`custom-controls ${
-                        controlsVisible ? "visible" : "hidden"
-                      }`}
-                    >
-                      <div className='controls-content'>
-                        <button onClick={togglePlay} className='control-button'>
-                          {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-                        </button>
-                        <button onClick={toggleMute} className='control-button'>
-                          {isMuted ? (
-                            <VolumeX size={16} />
-                          ) : (
-                            <Volume2 size={16} />
-                          )}
-                        </button>
-                        <input
-                          type='range'
-                          min='0'
-                          max={duration || 0}
-                          value={currentTime}
-                          onChange={handleSeek}
-                          step='0.1'
-                          className='seek-slider'
-                        />
-                        <span className='time-display'>
-                          {formatTime(currentTime)} / {formatTime(duration)}
-                        </span>
-                        <button
-                          className='control-button'
-                          onClick={() => {
-                            const videoWrapper =
-                              document.querySelector(".video-wrapper");
+            <p className="eyebrow-muted truncate">Now playing</p>
+          </div>
+        )}
 
-                            if (!videoWrapper) return;
+        <div
+          ref={shellRef}
+          className={`${stageClass} ${controlsShown ? "" : "cursor-none"}`}
+          onMouseMove={showControlsTemporarily}
+          onTouchStart={showControlsTemporarily}
+        >
+          {/* Sizing lives in index.css under `.gt-stage` — see the note there
+              about Video.js's default 300x150 and YouTube's attribute-sized
+              iframe. */}
+          <div className="absolute inset-0" onClick={togglePlay}>
+            <div ref={videoRef} data-vjs-player className="h-full w-full" />
+          </div>
 
-                            const isFullscreen =
-                              document.fullscreenElement ||
-                              document.webkitFullscreenElement ||
-                              document.mozFullScreenElement ||
-                              document.msFullscreenElement;
-
-                            if (isFullscreen) {
-                              if (document.exitFullscreen) {
-                                document.exitFullscreen();
-                              } else if (document.webkitExitFullscreen) {
-                                document.webkitExitFullscreen();
-                              } else if (document.mozCancelFullScreen) {
-                                document.mozCancelFullScreen();
-                              } else if (document.msExitFullscreen) {
-                                document.msExitFullscreen();
-                              }
-                            } else {
-                              if (videoWrapper.requestFullscreen) {
-                                videoWrapper.requestFullscreen();
-                              } else if (videoWrapper.webkitRequestFullscreen) {
-                                videoWrapper.webkitRequestFullscreen();
-                              } else if (videoWrapper.mozRequestFullScreen) {
-                                videoWrapper.mozRequestFullScreen();
-                              } else if (videoWrapper.msRequestFullscreen) {
-                                videoWrapper.msRequestFullscreen();
-                              }
-                            }
-
-                            setIsFullScreen((prev) => !prev);
-                          }}
-                        >
-                          {isFullScreen ? (
-                            <Minimize size={16} />
-                          ) : (
-                            <Expand size={16} />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className='video-info'>
-                <h2 className='video-title'>{mediaTitle}</h2>
-                <div className='video-description'>
-                  <p>{mediaOverview}</p>
-                  <p className=''>Release Date: {mediaReleaseDate}</p>
-                  <p className=''>Runtime: {mediaRuntime} minutes</p>
-                  <p className=''>
-                    Genres: {mediaGenres?.map((genre) => genre.name).join(", ")}
-                  </p>
-                </div>
-              </div>
+          {isLoading && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-accent" />
             </div>
-            {recommendations.length > 0 && (
-              <div className='recommendations-section'>
-                <h2 className='section-title'>Recommended for You</h2>
-                <div className='recommendation-scroll'>
-                  {recommendations.map((movie) => (
-                    <Link
-                      to={`/details/${type}/${movie.id}`}
-                      key={movie.id}
-                      className='movie-card'
-                    >
-                      <img
-                        src={
-                          movie.poster_path
-                            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-                            : "/fallback.jpg"
-                        }
-                        alt={movie.title || movie.name}
-                      />
-                      <div className='movie-overlay'>
-                        <h3>{movie.title || movie.name}</h3>
-                        <p>Rating: {movie.vote_average}</p>
-                        <p>
-                          Released:{" "}
-                          {(movie.release_date || movie.first_air_date) &&
-                            new Date(
-                              movie.release_date || movie.first_air_date
-                            ).toLocaleDateString("en-US", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+          )}
+
+          {/* Title bar over the video, fades with the controls. */}
+          <div
+            className={`pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center
+                        gap-3 bg-gradient-to-b from-black/80 to-transparent px-4 pb-10 pt-3
+                        transition-opacity duration-300 ${
+                          controlsShown ? "opacity-100" : "opacity-0"
+                        }`}
+          >
+            <span className="truncate text-caption font-medium text-white/90">
+              {title}
+            </span>
+          </div>
+
+          {/* Centre play affordance while paused */}
+          {!isPlaying && !isLoading && (
+            <button
+              onClick={togglePlay}
+              aria-label="Play"
+              className="absolute left-1/2 top-1/2 z-20 flex h-16 w-16 -translate-x-1/2
+                         -translate-y-1/2 items-center justify-center rounded-full
+                         bg-accent text-white transition hover:scale-105 hover:bg-accent-hover"
+            >
+              <Play size={24} className="ml-1 fill-current" aria-hidden="true" />
+            </button>
+          )}
+
+          {/* Control bar */}
+          <div
+            className={`absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/95
+                        via-black/55 to-transparent px-3 pb-3 pt-14 transition-opacity
+                        duration-300 md:px-4 ${
+                          controlsShown ? "opacity-100" : "pointer-events-none opacity-0"
+                        }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Scrub bar. Visible track is thin, but the input's hit area is
+                the full 16px height so it's easy to grab. */}
+            <div className="group/scrub relative mb-1 h-4 w-full">
+              <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full bg-white/25">
+                <div
+                  className="absolute inset-y-0 left-0 bg-white/40"
+                  style={{ width: `${bufferedPercent}%` }}
+                />
+                <div
+                  className="absolute inset-y-0 left-0 bg-accent"
+                  style={{ width: `${progressPercent}%` }}
+                />
               </div>
-            )}
+              <div
+                className={`pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2
+                            -translate-y-1/2 rounded-full bg-accent transition-transform
+                            duration-150 ${
+                              scrubbing ? "scale-125" : "scale-0 group-hover/scrub:scale-100"
+                            }`}
+                style={{ left: `${progressPercent}%` }}
+              />
+              <input
+                type="range"
+                min="0"
+                max={duration || 0}
+                value={currentTime}
+                onChange={handleSeek}
+                onMouseDown={() => setScrubbing(true)}
+                onMouseUp={() => setScrubbing(false)}
+                onTouchStart={() => setScrubbing(true)}
+                onTouchEnd={() => setScrubbing(false)}
+                step="0.1"
+                aria-label="Seek"
+                aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
+                className="absolute inset-0 h-full w-full cursor-pointer appearance-none
+                           bg-transparent [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4
+                           [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-transparent
+                           [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4
+                           [&::-webkit-slider-thumb]:appearance-none
+                           [&::-webkit-slider-thumb]:bg-transparent"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 text-white md:gap-1.5">
+              <button
+                onClick={togglePlay}
+                aria-label={isPlaying ? "Pause" : "Play"}
+                className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/10"
+              >
+                {isPlaying ? (
+                  <Pause size={18} className="fill-current" aria-hidden="true" />
+                ) : (
+                  <Play size={18} className="fill-current" aria-hidden="true" />
+                )}
+              </button>
+
+              <button
+                onClick={() => seekBy(-SEEK_STEP)}
+                aria-label="Back 10 seconds"
+                className="hidden h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/10 sm:flex"
+              >
+                <RotateCcw size={17} aria-hidden="true" />
+              </button>
+              <button
+                onClick={() => seekBy(SEEK_STEP)}
+                aria-label="Forward 10 seconds"
+                className="hidden h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/10 sm:flex"
+              >
+                <RotateCw size={17} aria-hidden="true" />
+              </button>
+
+              {/* Volume slider expands on hover — hidden on touch, where it
+                  isn't usable anyway. */}
+              <div className="group/vol hidden items-center sm:flex">
+                <button
+                  onClick={toggleMute}
+                  aria-label={isMuted ? "Unmute" : "Mute"}
+                  className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/10"
+                >
+                  {isMuted || volume === 0 ? (
+                    <VolumeX size={17} aria-hidden="true" />
+                  ) : volume < 0.5 ? (
+                    <Volume1 size={17} aria-hidden="true" />
+                  ) : (
+                    <Volume2 size={17} aria-hidden="true" />
+                  )}
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={isMuted ? 0 : volume}
+                  onChange={(e) => changeVolume(parseFloat(e.target.value))}
+                  aria-label="Volume"
+                  className="h-1 w-0 cursor-pointer appearance-none rounded-full bg-white/30
+                             opacity-0 transition-all duration-200 group-hover/vol:w-20
+                             group-hover/vol:opacity-100 focus:w-20 focus:opacity-100
+                             [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3
+                             [&::-webkit-slider-thumb]:appearance-none
+                             [&::-webkit-slider-thumb]:rounded-full
+                             [&::-webkit-slider-thumb]:bg-white"
+                />
+              </div>
+
+              <span className="ml-1 text-[12px] tabular-nums text-white/80">
+                {formatTime(currentTime)}
+                <span className="text-white/40"> / </span>
+                {formatTime(duration)}
+              </span>
+
+              <div className="flex-1" />
+
+              <button
+                onClick={togglePiP}
+                aria-label="Picture in picture"
+                className="hidden h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/10 sm:flex"
+              >
+                <PictureInPicture2 size={17} aria-hidden="true" />
+              </button>
+              <button
+                onClick={toggleFullscreen}
+                aria-label={isFullScreen ? "Exit fullscreen" : "Fullscreen"}
+                className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/10"
+              >
+                {isFullScreen ? (
+                  <Minimize size={17} aria-hidden="true" />
+                ) : (
+                  <Expand size={17} aria-hidden="true" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
-      </main>
-    </div>
+
+        {/* ---------- Below the player ---------- */}
+        {meta && (
+          <div className="mt-8">
+            <p className="eyebrow">
+              Goofy Tube {type === "tv" ? "Series" : "Original"}
+            </p>
+            <h1 className="mt-3 display-title text-h1 text-ink md:text-[2.75rem]">
+              {title}
+            </h1>
+            <p className="mt-4 max-w-prose text-body text-muted">
+              {meta.overview}
+            </p>
+            <button
+              onClick={() => navigate(`/details/${type}/${id}`)}
+              className="mt-6 rounded-full border border-hairline px-5 py-2 text-caption
+                         font-medium text-muted transition hover:border-hairline-strong hover:text-ink"
+            >
+              Full details
+            </button>
+
+            <p className="mt-6 text-[11px] text-faint">
+              Shortcuts: <kbd>space</kbd> play · <kbd>←</kbd>/<kbd>→</kbd> seek 10s ·{" "}
+              <kbd>↑</kbd>/<kbd>↓</kbd> volume · <kbd>f</kbd> fullscreen ·{" "}
+              <kbd>m</kbd> mute
+            </p>
+          </div>
+        )}
+      </div>
+
+      {recommendations.length > 0 && !isFullScreen && (
+        <div className="mt-10">
+          <MediaRail
+            title="More like this"
+            items={recommendations}
+            fallbackType={type}
+          />
+        </div>
+      )}
+    </main>
   );
 };
 

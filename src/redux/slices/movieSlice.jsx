@@ -9,6 +9,10 @@ const movieSlice = createSlice({
     tvTopRated: [],
     isLoading: false,
     error: null,
+    // Previously initialState declared `selectedGenreId` but the reducer wrote
+    // `state.selectedGenre` and Homepage read `state.selectedGenre`. It only
+    // worked because Immer permits adding new keys, leaving `selectedGenreId`
+    // as permanently-null dead state. One name now, used everywhere.
     selectedGenreId: null,
     selectedGenreType: null,
   },
@@ -32,8 +36,8 @@ const movieSlice = createSlice({
       state.error = action.payload;
     },
     setSelectedGenre: (state, action) => {
-      state.selectedGenre = action.payload.id;
-      state.selectedGenreType = action.payload.type;
+      state.selectedGenreId = action.payload.id ?? null;
+      state.selectedGenreType = action.payload.type ?? null;
     },
   },
 });

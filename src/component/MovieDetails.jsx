@@ -1,533 +1,501 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, StarIcon } from "lucide-react";
-import "./details.css";
-import { Link } from "react-router-dom";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, ChevronLeft, ChevronRight, Star, Play, Plus, Check } from "lucide-react";
+import MediaRail from "./MediaRail";
+import HeroTrailer from "./HeroTrailer";
+import Reveal from "./Reveal";
+import { isPlayableType, titleOf, ratingOf } from "../lib/media";
+import { profileImage, backdropUrl } from "../lib/images";
+import { useWatchlist } from "../lib/useWatchlist";
+
+const CACHE_TTL = 3600 * 1000; // 1 hour
+
+/** Reads a cached payload, tolerating corrupt or evicted entries. */
+function readCache(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) return null;
+    return parsed.value;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ value, timestamp: Date.now() }));
+  } catch {
+    // QuotaExceededError — the cache is an optimisation, not a requirement.
+  }
+}
 
 const MovieDetails = () => {
   const { id, type } = useParams();
+  const navigate = useNavigate();
+  const { watchlist, toggle: toggleWatchlistKey, isAuthenticated } = useWatchlist();
+  const location = useLocation();
+  const watchKey = `${type}:${id}`;
+  const toggleWatchlist = () => {
+    if (!isAuthenticated) {
+      navigate("/signin", { state: { from: `${location.pathname}${location.search}` } });
+      return;
+    }
+    toggleWatchlistKey(watchKey);
+  };
+
   const [media, setMedia] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [trailerUrl, setTrailerUrl] = useState(null);
+  const [notFound, setNotFound] = useState(false);
+  // The key (not a full URL) — HeroTrailer builds its own embed URL from it,
+  // and the append_to_response payload already contains it, so the hero costs
+  // no extra request.
+  const [trailerKey, setTrailerKey] = useState(null);
   const [cast, setCast] = useState([]);
-  const [directors, setDirectors] = useState([]); // Store directors
+  const [directors, setDirectors] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [images, setImages] = useState([]);
-  const [episodeCount, setEpisodeCount] = useState(null); // For TV shows
-  const navigate = useNavigate();
+  const galleryRef = useRef(null);
+  const [galleryEdges, setGalleryEdges] = useState({ start: true, end: false });
+
+  const updateGalleryEdges = useCallback(() => {
+    const el = galleryRef.current;
+    if (!el) return;
+    setGalleryEdges({
+      start: el.scrollLeft <= 8,
+      end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 8,
+    });
+  }, []);
 
   useEffect(() => {
-    const fetchDetails = async () => {
-      const cacheKey = `media_${type}_${id}`;
-      const cachedData = localStorage.getItem(cacheKey);
-      if (cachedData) {
-        const { media, timestamp } = JSON.parse(cachedData);
-        if (Date.now() - timestamp < 3600 * 1000) {
-          // 1 hour cache
-          setMedia(media);
-          setLoading(false);
-          return;
-        }
-      }
-
-      try {
-        const res = await fetch(
-          `https://api.themoviedb.org/3/${type}/${id}?language=en-US`,
-          {
-            method: "GET",
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
-            },
-          }
-        );
-        const data = await res.json();
-        setMedia(data);
-        localStorage.setItem(
-          cacheKey,
-          JSON.stringify({ media: data, timestamp: Date.now() })
-        );
-      } catch (err) {
-        console.error("Failed to fetch media details:", err);
-      } finally {
-        setLoading(false);
-      }
+    const el = galleryRef.current;
+    if (!el || !images.length) return;
+    updateGalleryEdges();
+    el.addEventListener("scroll", updateGalleryEdges, { passive: true });
+    const observer = new ResizeObserver(updateGalleryEdges);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateGalleryEdges);
+      observer.disconnect();
     };
+  }, [images, updateGalleryEdges]);
 
-    fetchDetails();
-  }, [id, type]);
+  const scrollGallery = (direction) => {
+    const el = galleryRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * Math.max(300, el.clientWidth * 0.8), behavior: "smooth" });
+  };
 
+  /*
+    Guard against an invalid :type in the URL (e.g. /details/person/123).
+    `loading` must be cleared here too — the fetch effect below bails out for
+    invalid types, so nothing else would ever turn it off and the page would
+    sit on the skeleton forever instead of showing "not found".
+  */
   useEffect(() => {
-    const fetchEpisodeCount = async () => {
-      if (type !== "tv" || !media?.seasons) return;
+    if (!isPlayableType(type)) {
+      setNotFound(true);
+      setLoading(false);
+    }
+  }, [type]);
 
-      try {
-        let totalEpisodes = 0;
-        for (const season of media.seasons) {
-          const cacheKey = `season_${type}_${id}_${season.season_number}`;
-          const cachedData = localStorage.getItem(cacheKey);
-          if (cachedData) {
-            const { episodes, timestamp } = JSON.parse(cachedData);
-            if (Date.now() - timestamp < 3600 * 1000) {
-              totalEpisodes += episodes.length;
-              continue;
-            }
-          }
-          const res = await fetch(
-            `https://api.themoviedb.org/3/tv/${id}/season/${season.season_number}?language=en-US`,
-            {
-              headers: {
-                accept: "application/json",
-                Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
-              },
-            }
-          );
-          const data = await res.json();
-          totalEpisodes += data.episodes?.length || 0;
-          localStorage.setItem(
-            cacheKey,
-            JSON.stringify({
-              episodes: data.episodes || [],
-              timestamp: Date.now(),
-            })
-          );
-        }
-        setEpisodeCount(totalEpisodes);
-      } catch (err) {
-        console.error("Failed to fetch season details:", err);
-        setEpisodeCount("Unknown");
-      }
-    };
-
-    if (media) fetchEpisodeCount();
-  }, [id, type, media]);
-
+  /*
+    One request instead of five (plus one per TV season). `append_to_response`
+    folds credits, videos, images and recommendations into the detail call.
+  */
   useEffect(() => {
-    const fetchImages = async () => {
-      const cacheKey = `images_${type}_${id}`;
-      const cachedData = localStorage.getItem(cacheKey);
-      if (cachedData) {
-        const { images, timestamp } = JSON.parse(cachedData);
-        if (Date.now() - timestamp < 3600 * 1000) {
-          setImages(images);
-          return;
-        }
-      }
+    if (!isPlayableType(type)) return;
+    const controller = new AbortController();
 
-      try {
-        const res = await fetch(
-          `https://api.themoviedb.org/3/${type}/${id}/images`,
-          {
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
-            },
-          }
-        );
-        const data = await res.json();
-        const backdrops = data.backdrops?.slice(0, 10) || [];
-        setImages(backdrops);
-        localStorage.setItem(
-          cacheKey,
-          JSON.stringify({ images: backdrops, timestamp: Date.now() })
-        );
-      } catch (err) {
-        console.error("Failed to fetch images:", err);
-      }
-    };
+    const applyPayload = (data) => {
+      setMedia(data);
+      setImages(data.images?.backdrops?.slice(0, 12) || []);
+      setRecommendations(data.recommendations?.results || []);
+      setCast(data.credits?.cast?.slice(0, 12) || []);
 
-    fetchImages();
-  }, [type, id]);
-
-  useEffect(() => {
-    const fetchRecommendations = async () => {
-      const cacheKey = `recommendations_${type}_${id}`;
-      const cachedData = localStorage.getItem(cacheKey);
-      if (cachedData) {
-        const { recommendations, timestamp } = JSON.parse(cachedData);
-        if (Date.now() - timestamp < 3600 * 1000) {
-          setRecommendations(recommendations);
-          return;
-        }
-      }
-
-      try {
-        const res = await fetch(
-          `https://api.themoviedb.org/3/${type}/${id}/recommendations`,
-          {
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
-            },
-          }
-        );
-        const data = await res.json();
-        const results = data.results || [];
-        setRecommendations(results);
-        localStorage.setItem(
-          cacheKey,
-          JSON.stringify({ recommendations: results, timestamp: Date.now() })
-        );
-      } catch (err) {
-        console.error("Failed to fetch recommendations:", err);
-      }
-    };
-
-    fetchRecommendations();
-  }, [type, id]);
-
-  useEffect(() => {
-    const fetchCastAndDirectors = async () => {
-      const cacheKey = `credits_${type}_${id}`;
-      const cachedData = localStorage.getItem(cacheKey);
-      if (cachedData) {
-        const { cast, directors, timestamp } = JSON.parse(cachedData);
-        if (Date.now() - timestamp < 3600 * 1000) {
-          setCast(cast);
-          setDirectors(directors);
-          return;
-        }
-      }
-
-      try {
-        const response = await fetch(
-          `https://api.themoviedb.org/3/${type}/${id}/credits`,
-          {
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
-            },
-          }
-        );
-        const data = await response.json();
-        const castData = data.cast?.slice(0, 12) || [];
-        let directorsData = [];
-
-        if (type === "movie") {
-          // Use provided logic for movies
-          directorsData =
-            data.crew?.filter(({ job }) => job === "Director") || [];
-        } else {
-          // For TV shows, use broader filter to catch directors
-          directorsData =
-            data.crew?.filter(
+      const crew = data.credits?.crew || [];
+      setDirectors(
+        type === "movie"
+          ? crew.filter(({ job }) => job === "Director")
+          : crew.filter(
               ({ job, known_for_department }) =>
                 job === "Director" || known_for_department === "Directing"
-            ) || [];
-        }
+            )
+      );
 
-        setCast(castData);
-        setDirectors(directorsData);
-        localStorage.setItem(
-          cacheKey,
-          JSON.stringify({
-            cast: castData,
-            directors: directorsData,
-            timestamp: Date.now(),
-          })
-        );
-      } catch (err) {
-        console.error("Error fetching cast and directors:", err);
-      }
+      const videos = data.videos?.results || [];
+      const trailer =
+        videos.find((v) => v.site === "YouTube" && v.type === "Trailer" && v.key) ||
+        videos.find((v) => v.site === "YouTube" && v.type === "Teaser" && v.key) ||
+        videos.find((v) => v.site === "YouTube" && v.key);
+      setTrailerKey(trailer?.key ?? null);
     };
 
-    fetchCastAndDirectors();
-  }, [id, type]);
+    const fetchAll = async () => {
+      setLoading(true);
+      setNotFound(false);
 
-  useEffect(() => {
-    const fetchVideo = async () => {
-      const cacheKey = `trailer_${type}_${id}`;
-      const cachedData = localStorage.getItem(cacheKey);
-      if (cachedData) {
-        const { trailerUrl, timestamp } = JSON.parse(cachedData);
-        if (Date.now() - timestamp < 3600 * 1000) {
-          setTrailerUrl(trailerUrl);
-          return;
-        }
+      const cacheKey = `tmdb_${type}_${id}_v2`;
+      const cached = readCache(cacheKey);
+      if (cached) {
+        applyPayload(cached);
+        setLoading(false);
+        return;
       }
 
       try {
         const res = await fetch(
-          `https://api.themoviedb.org/3/${type}/${id}/videos?language=en-US`,
+          `https://api.themoviedb.org/3/${type}/${id}?language=en-US&append_to_response=credits,videos,images,recommendations&include_image_language=en,null`,
           {
             method: "GET",
+            signal: controller.signal,
             headers: {
               accept: "application/json",
               Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
             },
           }
         );
+        if (res.status === 404) {
+          setNotFound(true);
+          return;
+        }
+        if (!res.ok) throw new Error(`TMDB responded ${res.status}`);
+
         const data = await res.json();
-        const trailer = data.results?.find(
-          (video) =>
-            video.type === "Trailer" && video.site === "YouTube" && video.key
-        );
-        const url = trailer
-          ? `https://www.youtube.com/watch?v=${trailer.key}`
-          : null;
-        setTrailerUrl(url);
-        localStorage.setItem(
-          cacheKey,
-          JSON.stringify({ trailerUrl: url, timestamp: Date.now() })
-        );
+        if (controller.signal.aborted) return;
+        applyPayload(data);
+        writeCache(cacheKey, data);
       } catch (err) {
-        console.error("Failed to fetch trailer:", err);
+        if (err.name !== "AbortError") {
+          console.error("Failed to fetch media details:", err);
+          setNotFound(true);
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
-    fetchVideo();
+    fetchAll();
+    return () => controller.abort();
   }, [id, type]);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "Unknown";
     const date = new Date(dateStr);
-    const day = date.getDate();
-    const month = date.toLocaleString("default", { month: "short" });
-    const year = date.getFullYear();
-    const getDaySuffix = (d) => {
-      if (d > 3 && d < 21) return "th";
-      switch (d % 10) {
-        case 1:
-          return "st";
-        case 2:
-          return "nd";
-        case 3:
-          return "rd";
-        default:
-          return "th";
-      }
-    };
-    return `${day}${getDaySuffix(day)} ${month} ${year}`;
+    if (Number.isNaN(date.getTime())) return "Unknown";
+    return date.toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
   };
 
   const formatRuntime = (minutes) => {
     if (!minutes) return "Unknown";
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
+    return hours ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
-  const formatCurrency = (amount) => {
-    if (!amount) return "Unknown";
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    }).format(amount);
+  /* navigate(-1) keeps the user in the app. window.history.back() sent them
+     off-site when they arrived via a shared link or a refresh. */
+  const handleBack = () => {
+    if (window.history.state?.idx > 0) navigate(-1);
+    else navigate("/");
   };
 
   if (loading) {
     return (
-      <div className='loader-screen'>
-        <div className='loader-content'>
-          <div className='film-spinner'>
-            <div className='reel-circle'></div>
-            <div className='reel-circle'></div>
-            <div className='reel-circle'></div>
-            <div className='reel-hole'></div>
-          </div>
-          <p className='loading-text'>Loading {type} details...</p>
+      <div className="pt-16">
+        <div className="skeleton h-[52vh] w-full" />
+        <div className="mx-auto max-w-6xl space-y-3 px-4 py-8 md:px-10">
+          <div className="skeleton h-8 w-1/3 rounded" />
+          <div className="skeleton h-4 w-2/3 rounded" />
+          <div className="skeleton h-4 w-1/2 rounded" />
         </div>
       </div>
     );
   }
 
-  if (!media) return <p>No {type} found.</p>;
+  if (notFound || !media) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
+        <h1 className="text-h1 text-ink">Title not found</h1>
+        <p className="mt-2 text-body text-muted">
+          We couldn&rsquo;t find anything at that address.
+        </p>
+        <button
+          onClick={handleBack}
+          className="mt-6 rounded-full bg-ink px-6 py-2.5 text-sm font-semibold text-ink-invert transition hover:bg-white"
+        >
+          Go back
+        </button>
+      </div>
+    );
+  }
+
+  const title = titleOf(media);
+  const rating = ratingOf(media);
+  const backdrop = backdropUrl(media.backdrop_path || media.poster_path);
+  const directorNames = [...new Set(directors.map((d) => d.name))].slice(0, 3);
+  const year = (media.release_date || media.first_air_date || "").slice(0, 4);
+
+  // Bullet-separated meta row: 2026 • 2h 08m • Sci-Fi Thriller • 16+
+  const metaParts = [
+    year || null,
+    type === "movie"
+      ? media.runtime
+        ? formatRuntime(media.runtime)
+        : null
+      : media.number_of_seasons
+        ? `${media.number_of_seasons} season${media.number_of_seasons === 1 ? "" : "s"}`
+        : null,
+    media.genres?.slice(0, 2).map((g) => g.name).join(" ") || null,
+    media.adult ? "18+" : type === "tv" ? "TV" : "PG",
+  ].filter(Boolean);
+
+  // Right-hand spec table from the reference layout.
+  const specs = [
+    ["Release", formatDate(media.release_date || media.first_air_date)],
+    [
+      type === "movie" ? "Runtime" : "Episodes",
+      type === "movie"
+        ? formatRuntime(media.runtime)
+        : /*
+             TMDB returns this directly. The old code fired one sequential
+             request PER SEASON to count episodes by hand.
+           */
+          (media.number_of_episodes ?? "Unknown"),
+    ],
+    ["Director", directorNames.length ? directorNames.join(", ") : "Not specified"],
+    [
+      type === "movie" ? "Production" : "Network",
+      (type === "movie"
+        ? media.production_companies?.slice(0, 2).map((c) => c.name).join(", ")
+        : media.networks?.map((n) => n.name).join(", ")) || "Not specified",
+    ],
+    [
+      "Country / Language",
+      [
+        media.production_countries?.[0]?.iso_3166_1,
+        media.original_language?.toUpperCase(),
+      ]
+        .filter(Boolean)
+        .join(" / ") || "Not specified",
+    ],
+  ];
+
+  const inWatchlist = watchlist.includes(watchKey);
 
   return (
-    <div
-      className='details-container'
-      style={{
-        backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.6), rgba(0,0,0,0.95)), url(https://image.tmdb.org/t/p/original${
-          media.backdrop_path || media.poster_path || "/fallback.jpg"
-        })`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-      }}
-    >
-      <button onClick={() => window.history.back()} className='back-button'>
-        <ArrowLeft /> <span>Back</span>
-      </button>
-
-      <div className='details-header'>
-        <img
-          src={
-            media.poster_path
-              ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
-              : "/fallback.jpg"
-          }
-          alt={media.title || media.name}
-          className='details-poster'
+    <div>
+      {/* ---------- Hero ---------- */}
+      <section className="relative">
+        {/*
+          Backdrop that crossfades into the trailer. Scrim gradients live
+          inside HeroTrailer so they stay above the video and hero text
+          remains readable over any frame. The scrim is still confined to the
+          hero — the original stretched it over the whole scrolling page.
+        */}
+        <HeroTrailer
+          backdropSrc={backdrop}
+          trailerKey={trailerKey}
+          title={title}
         />
 
-        <div className='details-info'>
-          <h1>{media.title || media.name}</h1>
-          <p>
-            <strong>Tagline:</strong> {media.tagline || "Not available"}
-          </p>
-          <p>
-            <strong>Release Date:</strong>{" "}
-            {formatDate(media.release_date || media.first_air_date)}
-          </p>
-          <p className='imdb'>
-            <strong>IMDb Rating:</strong>
-            <StarIcon size={20} className='imdb-icon' color='#FFD700' />
-            {media.vote_average.toFixed(1)}/10 ({media.vote_count} votes)
-          </p>
-          <p>
-            <strong>Genres:</strong>{" "}
-            {media.genres?.map((genre) => genre.name).join(", ") ||
-              "Not specified"}
-          </p>
-          {type === "tv" ? (
-            <>
-              <p>
-                <strong>Number of Seasons:</strong>{" "}
-                {media.number_of_seasons || "Unknown"}
+        <div className="relative px-4 pb-12 pt-10 md:px-10 md:pb-16 md:pt-16">
+          <button
+            onClick={handleBack}
+            className="mb-10 inline-flex items-center gap-2 text-caption text-muted
+                       transition hover:text-ink"
+          >
+            <ArrowLeft size={15} aria-hidden="true" /> Back
+          </button>
+
+          <div className="max-w-2xl pt-16 md:pt-28">
+            <p className="eyebrow">
+              Goofy Tube {type === "tv" ? "Series" : "Original"}
+            </p>
+
+            <h1 className="mt-3 display-title text-[2.5rem] text-ink sm:text-[3.5rem] md:text-[4.25rem]">
+              {title}
+            </h1>
+
+            <div className="meta-dots mt-4 text-caption text-muted">
+              {metaParts.map((part) => (
+                <span key={part}>{part}</span>
+              ))}
+              {/*
+                Read through ratingOf(), which tolerates the field being
+                absent. `media.vote_average.toFixed(1)` used to throw and
+                white-screen the entire page.
+              */}
+              {rating && (
+                <span className="inline-flex items-center gap-1 text-ink">
+                  <Star size={12} className="fill-gold text-gold" aria-hidden="true" />
+                  {rating}
+                </span>
+              )}
+            </div>
+
+            {/*
+              The tagline goes here rather than the overview — the overview
+              has its own section below, and printing it in both places read
+              as a duplication bug.
+            */}
+            {media.tagline && (
+              <p className="mt-5 max-w-lg text-body italic text-muted">
+                {media.tagline}
               </p>
-              <p>
-                <strong>Total Episodes:</strong>{" "}
-                {episodeCount ?? "Calculating..."}
-              </p>
-              <p>
-                <strong>Episode Runtime:</strong>{" "}
-                {media.episode_run_time?.length
-                  ? formatRuntime(media.episode_run_time[0])
-                  : "Unknown"}
-              </p>
-              <p>
-                <strong>Network:</strong>{" "}
-                {media.networks?.map((n) => n.name).join(", ") ||
-                  "Not specified"}
-              </p>
-            </>
-          ) : (
-            <>
-              <p>
-                <strong>Runtime:</strong> {formatRuntime(media.runtime)}
-              </p>
-              <p>
-                <strong>Budget:</strong> {formatCurrency(media.budget)}
-              </p>
-              <p>
-                <strong>Revenue:</strong> {formatCurrency(media.revenue)}
-              </p>
-              <p>
-                <strong>Production Companies:</strong>{" "}
-                {media.production_companies?.map((c) => c.name).join(", ") ||
-                  "Not specified"}
-              </p>
-            </>
-          )}
-          <p>
-            <strong>Status:</strong> {media.status || "Not specified"}
-          </p>
-          <p>
-            <strong>Original Language:</strong>{" "}
-            {media.original_language?.toUpperCase() || "Not specified"}
-          </p>
-          <p>
-            <strong>Director:</strong>{" "}
-            {directors.length > 0
-              ? directors.map((d) => d.name).join(", ")
-              : "Not specified"}
-          </p>
-          <p>
-            <strong>Overview:</strong>
-            <br />
+            )}
+
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              {trailerKey ? (
+                <button
+                  onClick={() => navigate(`/watch/${type}/${id}`)}
+                  className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3
+                             text-caption font-semibold text-white transition duration-200
+                             hover:bg-accent-hover hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <Play size={16} className="fill-current" aria-hidden="true" />
+                  Watch trailer
+                </button>
+              ) : (
+                <span className="rounded-full border border-hairline px-6 py-3 text-caption text-faint">
+                  No trailer available
+                </span>
+              )}
+
+              <button
+                onClick={toggleWatchlist}
+                aria-pressed={isAuthenticated ? inWatchlist : false}
+                aria-label={!isAuthenticated ? `Sign in to add ${title} to my list` : inWatchlist ? `Remove ${title} from my list` : `Add ${title} to my list`}
+                className="inline-flex items-center gap-2 rounded-full border border-hairline-strong
+                           bg-white/5 px-6 py-3 text-caption font-semibold text-ink
+                           backdrop-blur-sm transition duration-200 hover:bg-white/10"
+              >
+                {inWatchlist ? (
+                  <Check size={16} aria-hidden="true" />
+                ) : (
+                  <Plus size={16} aria-hidden="true" />
+                )}
+                {!isAuthenticated
+                  ? "Sign in to add to watch list"
+                  : inWatchlist
+                    ? "Remove from watch list"
+                    : "Add to watch list"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ---------- Overview + specs ---------- */}
+      <Reveal as="section" className="mx-auto grid max-w-[1400px] gap-10 px-4 py-14 md:grid-cols-[1fr_minmax(280px,420px)] md:gap-16 md:px-10">
+        <div>
+          <p className="eyebrow">Overview</p>
+          <p className="mt-5 max-w-prose text-body leading-relaxed text-muted">
             {media.overview || "No overview available."}
           </p>
-          {trailerUrl ? (
-            <button
-              className='watch-button'
-              onClick={() => navigate(`/watch/${type}/${id}`)}
-            >
-              Watch Trailer
-            </button>
-          ) : (
-            <strong>No trailer available.</strong>
-          )}
         </div>
-      </div>
 
+        <dl className="self-start">
+          {specs.map(([label, value]) => (
+            <div
+              key={label}
+              className="flex items-baseline justify-between gap-6 border-b border-hairline py-3.5"
+            >
+              <dt className="shrink-0 text-caption text-faint">{label}</dt>
+              <dd className="text-right text-caption text-ink">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </Reveal>
+
+      {/* ---------- Cast ---------- */}
+      {cast.length > 0 && (
+        <section className="mx-auto max-w-[1400px] px-4 pb-14 md:px-10">
+          <Reveal>
+            <h2 className="text-h2 text-ink">Cast</h2>
+          </Reveal>
+          {/* 8 columns at the capped width keeps each card ~150px — in line
+              with the poster cards in the rails. It was 6 columns across the
+              full viewport, which ballooned to ~300px on a wide monitor. */}
+          <div className="mt-6 grid grid-cols-3 gap-x-4 gap-y-7 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+            {cast.map((actor, i) => {
+              const profile = profileImage(actor.profile_path);
+              return (
+                <Reveal
+                  key={actor.credit_id ?? actor.id}
+                  delay={Math.min(i, 8) * 40}
+                >
+                  {profile ? (
+                    <img
+                      src={profile.src}
+                      srcSet={profile.srcSet}
+                      sizes="(max-width: 640px) 30vw, 160px"
+                      alt={actor.name}
+                      loading="lazy"
+                      className="aspect-[2/3] w-full rounded-card object-cover ring-1 ring-hairline"
+                    />
+                  ) : (
+                    <div className="flex aspect-[2/3] w-full items-center justify-center rounded-card bg-surface-2 text-xl text-faint">
+                      {(actor.name || "?").charAt(0)}
+                    </div>
+                  )}
+                  <p className="mt-2.5 line-clamp-1 text-caption font-semibold text-ink">
+                    {actor.name}
+                  </p>
+                  <p className="line-clamp-1 text-[11px] text-faint">
+                    {actor.character}
+                  </p>
+                </Reveal>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* ---------- Gallery ---------- */}
       {images.length > 0 && (
-        <div className='extra-photos-section'>
-          <h2>Gallery</h2>
-          <div className='extra-photos-scroll'>
+        <section className="mx-auto max-w-[1400px] px-4 pb-14 md:px-10">
+          <Reveal className="flex items-center justify-between gap-4">
+            <h2 className="text-h2 text-ink">Gallery</h2>
+            <div className="flex gap-2" aria-label="Gallery navigation">
+              <button type="button" onClick={() => scrollGallery(-1)} disabled={galleryEdges.start} aria-label="Previous gallery images" className="flex h-10 w-10 items-center justify-center rounded-full border border-hairline bg-surface text-ink transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-30"><ChevronLeft size={20} aria-hidden="true" /></button>
+              <button type="button" onClick={() => scrollGallery(1)} disabled={galleryEdges.end} aria-label="Next gallery images" className="flex h-10 w-10 items-center justify-center rounded-full border border-hairline bg-surface text-ink transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-30"><ChevronRight size={20} aria-hidden="true" /></button>
+            </div>
+          </Reveal>
+          <div ref={galleryRef} tabIndex="0" aria-label={`${title} image gallery`} className="scrollbar-none mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth focus-visible:outline-none">
             {images.map((img, i) => (
               <img
-                key={i}
-                src={`https://image.tmdb.org/t/p/w500${img.file_path}`}
-                alt='Media still'
-                className='extra-photo'
-                loading='lazy'
+                key={img.file_path ?? i}
+                src={`https://image.tmdb.org/t/p/w780${img.file_path}`}
+                alt={`Still from ${title}`}
+                loading="lazy"
+                decoding="async"
+                className="aspect-video w-[70vw] shrink-0 snap-start rounded-card object-cover ring-1 ring-hairline sm:w-[300px]"
               />
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {cast.length > 0 && (
-        <div className='cast-section'>
-          <h2>Top Cast</h2>
-          <div className='cast-grid'>
-            {cast.map((actor) => (
-              <div className='cast-card' key={actor.id}>
-                <img
-                  src={
-                    actor.profile_path
-                      ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
-                      : "/fallback.jpg"
-                  }
-                  alt={actor.name}
-                  loading='lazy'
-                />
-                <p className='actor-name'>{actor.name}</p>
-                <p className='character-name'>{actor.character}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
+      {/* ---------- More like this ---------- */}
+      {/*
+        Reuses MediaRail rather than a bespoke grid. As a 6-column grid across
+        the full viewport these cards grew to ~300px wide on a large monitor;
+        the rail pins them at the same ~180px used everywhere else, so card
+        size is defined in exactly one place.
+      */}
       {recommendations.length > 0 && (
-        <div className='recommendations-section' style={{ marginTop: "3rem" }}>
-          <h2 className='section-title'>Recommended for You</h2>
-          <div className='recommendation-scroll'>
-            {recommendations.map((item) => (
-              <Link
-                to={`/details/${type}/${item.id}`}
-                key={item.id}
-                className='movie-card'
-              >
-                <img
-                  src={
-                    item.poster_path
-                      ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
-                      : "/fallback.jpg"
-                  }
-                  alt={item.title || item.name}
-                  loading='lazy'
-                />
-                <div className='movie-overlay'>
-                  <h3>{item.title || item.name}</h3>
-                  <p>Rating: {item.vote_average}</p>
-                  <p>
-                    Released:{" "}
-                    {(item.release_date || item.first_air_date) &&
-                      new Date(
-                        item.release_date || item.first_air_date
-                      ).toLocaleDateString("en-US", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
+        <div className="pb-10">
+          <MediaRail
+            title="More like this"
+            items={recommendations}
+            fallbackType={type}
+          />
         </div>
       )}
     </div>

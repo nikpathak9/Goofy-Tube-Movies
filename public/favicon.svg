@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Goofy Tube">
+  <!--
+    Brand mark: rounded crimson tile with a play triangle cut out of it.
+    Drawn on a 64px grid with heavy weights so it stays legible at 16px.
+  -->
+  <rect width="64" height="64" rx="15" fill="#e11d2e"/>
+  <path d="M25 20.5v23a1.8 1.8 0 0 0 2.74 1.54l18.4-11.5a1.8 1.8 0 0 0 0-3.08l-18.4-11.5A1.8 1.8 0 0 0 25 20.5Z" fill="#fff"/>
+</svg>

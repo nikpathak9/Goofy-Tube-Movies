@@ -1,398 +1,434 @@
-@import url("https://fonts.googleapis.com/css2?family=Mona+Sans:ital,wght@0,200..900;1,200..900&display=swap");
+@import "tailwindcss";
 
-/* ========== Base Styles ========== */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* ==========================================================================
+   Goofy Tube — design tokens
+
+   Everything visual is defined here and consumed as Tailwind utilities
+   (bg-surface, text-muted, etc). The previous setup had seven global
+   stylesheets defining the same class names (.movie-card, .section-title,
+   .back-button, .loading-spinner) with whichever one Vite imported last
+   winning — which is why the same component looked different page to page.
+   ========================================================================== */
+
+@theme {
+  /* --- Surfaces -----------------------------------------------------------
+     Near-black with a slight blue cast. Elevation is communicated by surface
+     tint rather than by shadow, which is what makes the UI read as current.
+     The old `linear-gradient(to right, rgb(40,23,46), #1b1827)` body wash was
+     the single most dating element in the app. */
+  /* `--color-shell` is the page backdrop OUTSIDE the rounded frame;
+     `--color-base` is the frame's own surface, one step lighter so the
+     inset card reads as sitting on top of the page. */
+  --color-shell: #050507;
+  --color-base: #0d0d10;
+  /* Alias of --color-base for use as a TEXT colour (dark text on a light
+     button). Defining it separately avoids `text-base`, which collides with
+     Tailwind's built-in font-size utility of the same name — the colour wins,
+     so anyone later writing `text-base` expecting 1rem would silently get a
+     colour instead. */
+  --color-ink-invert: #0d0d10;
+  --color-surface: #141418;
+  --color-surface-2: #1c1c21;
+  --color-surface-3: #26262c;
+
+  /* --- Text --- */
+  --color-ink: #f5f5f5;
+  --color-muted: #9a9aa2;
+  --color-faint: #5a5a63;
+
+  /* --- Accent: one colour, used sparingly --- */
+  --color-accent: #e11d2e;
+  --color-accent-hover: #f43f4e;
+  --color-accent-soft: rgba(225, 29, 46, 0.14);
+
+  --color-gold: #fbbf24;
+
+  /* --- Borders --- */
+  --color-hairline: rgba(255, 255, 255, 0.08);
+  --color-hairline-strong: rgba(255, 255, 255, 0.16);
+
+  /* --- Type scale --- */
+  --text-display: 3rem;
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.03em;
+  --text-display--font-weight: 600;
+
+  --text-h1: 2rem;
+  --text-h1--line-height: 1.15;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h1--font-weight: 600;
+
+  --text-h2: 1.375rem;
+  --text-h2--line-height: 1.3;
+  --text-h2--letter-spacing: -0.01em;
+  --text-h2--font-weight: 600;
+
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.6;
+
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.4;
+
+  --font-sans: "Mona Sans", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+
+  /* --- Radii --- */
+  --radius-card: 0.5rem;
+  --radius-sheet: 0.75rem;
+  /* The outer page frame — the large soft corner from the reference. */
+  --radius-frame: 1.5rem;
+
+  /* --- Motion ---------------------------------------------------------------
+     Every animation in the app pulls its duration and easing from here, so
+     timing stays consistent instead of drifting per component. */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 400ms;
+  /* Card expansion and the hero backdrop→trailer crossfade. */
+  --duration-expand: 320ms;
+  --duration-crossfade: 700ms;
+
+  /* Hover-intent: how long a pointer must rest on a card before it expands,
+     and how long the expanded card waits before requesting a preview. */
+  --delay-hover-intent: 400ms;
 }
 
-body {
-  background: linear-gradient(to right, rgb(40, 23, 46), #1b1827);
-  font-family: "Mona Sans", sans-serif;
-  color: #f3f3f3;
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+  * {
+    /* Keep sticky headers from covering in-page anchor targets. */
+    scroll-margin-top: 5rem;
+  }
+
+  html {
+    background-color: var(--color-shell);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-shell);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  /* A single visible focus treatment across the app. Previously there were
+     no focus styles at all, making keyboard navigation impossible to follow. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: white;
+  }
+
+  /* Scrollbars, dark-theme aware. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-surface-3) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-3);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3f3f4a;
+    background-clip: content-box;
+  }
 }
 
-/* ========== Animations ========== */
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
 }
 
-@keyframes fadeInOut {
-  0%,
-  100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 1;
+/* Rails fade out at their edges so content reads as continuing off-screen
+   rather than stopping at a hard boundary. */
+@utility rail-mask {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 2rem,
+    black calc(100% - 4rem),
+    transparent 100%
+  );
+}
+
+@utility rail-mask-start {
+  mask-image: linear-gradient(
+    to right,
+    black 0,
+    black calc(100% - 4rem),
+    transparent 100%
+  );
+}
+
+@utility text-balance-wrap {
+  text-wrap: balance;
+}
+
+/* The card itself grows over its reserved slot. Rails temporarily expose the
+   active card so neither their overflow nor edge mask clips the expansion. */
+.media-card {
+  isolation: isolate;
+}
+.media-card-surface {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-card);
+  transition: border-radius var(--duration-expand) var(--ease-emphasis), box-shadow var(--duration-expand) var(--ease-out-soft), background-color var(--duration-base) ease;
+}
+.media-card-expanded .media-card-surface {
+  height: var(--media-card-height);
+  overflow: hidden;
+  border-radius: var(--radius-sheet);
+}
+.media-card-expanded .media-card-media-link { height: 100%; }
+.media-card-media {
+  transition: height var(--duration-expand) var(--ease-emphasis), border-radius var(--duration-expand) var(--ease-emphasis), box-shadow var(--duration-expand) var(--ease-out-soft);
+}
+.media-card-expanded .media-card-media {
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: var(--radius-sheet);
+}
+.media-card-backdrop {
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out-soft);
+}
+.media-card-expanded .media-card-backdrop { opacity: 1; }
+.media-card-preview {
+  width: max(100%, calc(var(--media-card-height) * 1.7778));
+  height: var(--media-card-height);
+  transform: translate(-50%, -50%);
+  transition: opacity var(--duration-crossfade) var(--ease-out-soft);
+}
+.hero-carousel-preview {
+  width: 177.78vh;
+  min-width: 100%;
+  height: 56.25vw;
+  min-height: 100%;
+  transform: translate(-50%, -50%);
+  transition: opacity var(--duration-crossfade) var(--ease-out-soft);
+}
+.media-card-details {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity var(--duration-base) ease;
+}
+.media-card-gradient {
+  opacity: .82;
+  transition: opacity var(--duration-base) var(--ease-out-soft);
+}
+.media-card-expanded .media-card-gradient { opacity: 1; }
+.media-card-copy {
+  transition: padding var(--duration-expand) var(--ease-emphasis);
+}
+.media-card-expanded .media-card-copy { padding: 1rem; }
+.media-card-title {
+  transition: font-size var(--duration-expand) var(--ease-emphasis);
+}
+.media-card-expanded .media-card-title { font-size: 1rem; }
+.media-card-expanded-content {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(.5rem);
+  transition: max-height var(--duration-expand) var(--ease-emphasis), opacity var(--duration-base) var(--ease-out-soft), transform var(--duration-expand) var(--ease-emphasis);
+}
+.media-card-expanded .media-card-expanded-content {
+  max-height: 10rem;
+  opacity: 1;
+  transform: translateY(0);
+}
+.media-rail-item {
+  transform-origin: top left;
+}
+.media-rail-item:has(.media-card-expanded) {
+  width: min(70vw, 324px);
+}
+.media-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+.media-grid-item {
+  width: calc((100% - 1.5rem) / 3);
+  transform-origin: top left;
+}
+.media-grid-item:has(.media-card-expanded) {
+  width: min(70vw, 360px);
+}
+@media (min-width: 640px) {
+  .media-grid-item { width: clamp(140px, 16vw, 180px); }
+  .media-grid-item:has(.media-card-expanded) { width: min(360px, 100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-card-surface, .media-card-media, .media-card-backdrop, .media-card-details, .media-card-gradient, .media-card-copy, .media-card-title, .media-card-expanded-content { transition: none; }
+  .media-rail-track { scroll-behavior: auto; }
+}
+
+/* The small red uppercase kicker above a title or section heading — the
+   most recognisable motif in the reference design. */
+@utility eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+@utility eyebrow-muted {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+/* Condensed, tightly-tracked uppercase display type for title treatments. */
+@utility display-title {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}
+
+/* Bullet-separated inline metadata (2026 • 2h 08m • Sci-Fi • 16+). Uses a
+   generated separator so the markup stays a plain list of spans and there's
+   no trailing bullet to strip. */
+@utility meta-dots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  & > * + *::before {
+    content: "•";
+    margin: 0 0.6rem;
+    color: var(--color-faint);
   }
 }
 
-@keyframes loadProgress {
-  0% {
-    transform: translateX(-100%);
-  }
-  50% {
-    transform: translateX(0%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
+/* ==========================================================================
+   Boot loader (markup lives in index.html, before React mounts)
+   ========================================================================== */
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ========== Loader Styles ========== */
 .loader-screen {
   position: fixed;
   inset: 0;
-  z-index: 99999;
-  background: radial-gradient(circle, #1b1827 0%, #0f0c1a 100%);
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--color-base);
 }
 
 .loader-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
-  text-align: center;
+  gap: 1.25rem;
 }
 
 .film-spinner {
   position: relative;
-  width: 80px;
-  height: 80px;
-  border: 6px solid #a78bfa;
+  width: 56px;
+  height: 56px;
+  border: 2px solid var(--color-hairline-strong);
+  border-top-color: var(--color-accent);
   border-radius: 50%;
-  animation: spin 1.5s linear infinite;
-  background: radial-gradient(circle at center, #2a2a3c 30%, transparent 31%);
+  animation: gt-spin 900ms linear infinite;
 }
 
-.reel-circle {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  background: #a78bfa;
-  border-radius: 50%;
-}
-
-.reel-circle:nth-child(1) {
-  top: 10%;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.reel-circle:nth-child(2) {
-  bottom: 10%;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.reel-circle:nth-child(3) {
-  top: 50%;
-  left: 10%;
-  transform: translateY(-50%);
-}
-
+/* The three decorative reels are no longer needed with the simpler spinner,
+   but the markup ships in index.html, so they're neutralised here. */
+.reel-circle,
 .reel-hole {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  background: #0f0c1a;
-  border-radius: 50%;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  box-shadow: inset 0 0 6px rgba(255, 255, 255, 0.2);
+  display: none;
 }
 
 .loading-text {
-  font-family: "Mona Sans", sans-serif;
-  color: #e5e5ff;
-  font-size: 1.2rem;
-  animation: fadeInOut 2s ease-in-out infinite;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
 }
 
 .progress-bar {
-  width: 200px;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  width: 180px;
+  height: 3px;
+  background: var(--color-surface-2);
+  border-radius: 999px;
   overflow: hidden;
-  position: relative;
 }
 
 .progress {
-  width: 100%;
+  width: 40%;
   height: 100%;
-  background: linear-gradient(to right, #a78bfa, #7c3aed);
-  animation: loadProgress 3s ease-in-out infinite;
+  border-radius: 999px;
+  background: var(--color-accent);
+  animation: gt-indeterminate 1.4s var(--ease-out-soft) infinite;
 }
 
-/* ========== Layout Components ========== */
-.video-player-container {
-  min-height: 100vh;
-  font-family: "Mona Sans", sans-serif;
-  color: #ccc;
-  padding: 1rem;
+/* `.fade-out` was applied by JS but never defined in CSS, so the loader used
+   to vanish abruptly instead of fading. */
+.loader-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms ease-out;
 }
 
-.main-content {
-  display: flex;
-  justify-content: center;
+@keyframes gt-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.content-wrapper {
-  width: 100%;
-  max-width: 95%;
-  margin: 0 auto;
-  padding: 0 2rem;
-  box-sizing: border-box;
+@keyframes gt-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
 }
 
-/* ========== Navigation ========== */
-.navbar {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: 2rem 0;
-  z-index: 10001;
-  position: relative;
-}
-
-.nav-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  max-width: 90%;
-  padding: 1.5rem 2rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.logo-section {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  text-decoration: none;
-}
-
-.logo-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  background: linear-gradient(135deg, #a78bfa, #7c3aed);
-  border-radius: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 0.75rem;
-}
-
-.logo-video-icon {
-  width: 1.5rem;
-  height: 1.5rem;
-  color: white;
-}
-
-.logo-text {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #a78bfa;
-}
-
-.nav-items {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-}
-
-/* ========== Search Bar ========== */
-.search-bar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 2rem;
-  padding: 0.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.3s ease;
-}
-
-.search-bar:focus-within {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: #a78bfa;
-}
-
-.search-input {
-  background: transparent;
-  border: none;
-  outline: none;
-  padding: 0.75rem 1rem;
-  color: #f3f3f3;
-  font-size: 1rem;
-  flex: 1;
-  min-width: 20rem;
-}
-
-.search-input::placeholder {
-  color: #bbb;
-}
-
-.search-button {
-  background: linear-gradient(135deg, #a78bfa, #7c3aed);
-  border: none;
-  border-radius: 50%;
-  padding: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.search-button:hover {
-  background: linear-gradient(135deg, #c084fc, #a78bfa);
-}
-
-.clear-button {
-  position: absolute;
-  right: 2.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: #ccc;
-}
-
-.clear-button:hover {
-  color: #fff;
-}
-
-.search-results {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 100%;
-  max-height: 320px;
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(12px);
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  z-index: 99;
-  overflow-y: auto;
-  padding: 0.75rem 0.5rem;
-  margin-top: 6px;
-  display: flex;
-  flex-direction: column;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  animation: fadeIn 0.25s ease-in-out;
-  scrollbar-width: thin;
-  scrollbar-color: #a78bfa rgba(255, 255, 255, 0.05);
-}
-
-.search-result-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.8rem 1.2rem;
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 5px;
-  transition: background 0.3s ease, transform 0.2s ease;
-  cursor: pointer;
-  color: #f5f5f5;
-  width: 100%;
-  height: 150px;
-  font-family: "Mona Sans", sans-serif;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-}
-
-.search-result-item:hover {
-  background: rgba(167, 139, 250, 0.1);
-  transform: translateY(-2px);
-  border-color: rgba(167, 139, 250, 0.4);
-}
-
-.search-result-img {
-  width: 70px;
-  height: 100px;
-  object-fit: cover;
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.search-result-item span {
-  font-size: 1rem;
-  font-weight: 500;
-  color: #e0dfff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.search-results::-webkit-scrollbar {
-  width: 8px;
-}
-
-.search-results::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 8px;
-}
-
-.search-results::-webkit-scrollbar-thumb {
-  background-color: #a78bfa;
-  border-radius: 8px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-@keyframes fadeIn {
+@keyframes gt-fade-up {
   from {
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -400,833 +436,139 @@ body {
   }
 }
 
-/* ========== Video Player ========== */
-.video-section {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 2rem;
+@keyframes gt-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }
 
-.video-and-info {
-  display: flex;
-  gap: 2rem;
-  align-items: flex-start;
+.animate-fade-up {
+  animation: gt-fade-up 400ms var(--ease-out-soft) both;
 }
 
-.video-container {
-  flex: 2;
+/* Skeleton shimmer for loading cards. */
+.skeleton {
   position: relative;
-  min-height: 180px;
-  width: 100%;
-}
-
-.video-wrapper {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  min-height: 180px;
-  border-radius: 0.75rem;
   overflow: hidden;
-  background-color: #000;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
-  position: relative;
-  height: 100%;
+  background: var(--color-surface-2);
 }
-
-.video-js {
-  width: 100% !important;
-  height: 100% !important;
-  background-color: #000;
-  border-radius: 0.75rem;
-  position: relative;
-  min-height: 180px;
-}
-
-.video-js .vjs-tech {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: contain;
+.skeleton::after {
+  content: "";
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.05),
+    transparent
+  );
+  animation: gt-shimmer 1.6s infinite;
 }
 
-.video-js video {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: contain;
-  display: block;
-}
+/* ==========================================================================
+   Scroll reveals
 
-.video-element {
-  width: 100% !important;
-  height: 100% !important;
-  background-color: #000;
-  display: block;
-  min-height: 200px;
-}
+   Driven by IntersectionObserver (see lib/useInView.js). The element starts
+   translated and transparent, and gets `.is-revealed` once it enters view.
+   Transform + opacity only, so it composites on the GPU and never triggers
+   layout.
+   ========================================================================== */
 
-.video-js .vjs-poster {
-  background-size: cover;
-  background-position: center;
-}
-
-.video-js .vjs-loading-spinner {
-  display: none;
-}
-
-.loading-spinner {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 10;
-}
-
-.spinner {
-  width: 3rem;
-  height: 3rem;
-  border: 4px solid rgba(255, 255, 255, 0.2);
-  border-top: 4px solid #a78bfa;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-/* ========== Video Controls ========== */
-.custom-controls {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  background: rgba(40, 23, 46, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  z-index: 10000;
-  width: 100%;
-  box-sizing: border-box;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 0 0 12px 12px;
-  transition: all 0.3s ease;
+.reveal {
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+  transition:
+    opacity var(--duration-slow) var(--ease-out-soft),
+    transform var(--duration-slow) var(--ease-out-soft);
+  transition-delay: var(--reveal-delay, 0ms);
   will-change: opacity, transform;
 }
 
-.custom-controls.hidden {
-  opacity: 0;
-  transform: translateY(100%);
-  pointer-events: none;
-}
-
-.custom-controls.visible {
+.reveal.is-revealed {
   opacity: 1;
-  transform: translateY(0);
-  pointer-events: all;
+  transform: translate3d(0, 0, 0);
 }
 
-.video-wrapper {
-  position: relative;
+/* Once revealed there's nothing left to composite; dropping the hint frees
+   the layer rather than leaving one promoted per card. */
+.reveal.is-settled {
+  will-change: auto;
+  transition-delay: 0ms;
+}
+
+/* ==========================================================================
+   Video player
+
+   Video.js ships `.video-js { width: 300px; height: 150px }` and the YouTube
+   tech injects an iframe carrying fixed width/height ATTRIBUTES (640x360) with
+   no sizing CSS of its own. Left alone, the video renders as a small box in
+   the top-left corner of the stage.
+
+   Tailwind arbitrary variants (`[&_iframe]:w-full`) weren't reliable here
+   because attribute-sized iframes and Video.js's own rules need explicit
+   overrides, so these are plain rules scoped to `.gt-stage`.
+   ========================================================================== */
+
+.gt-stage .video-js,
+.gt-stage .vjs-tech {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none;
+}
+
+/* The iframe is created by the YouTube IFrame API, which sets width/height
+   attributes. CSS wins over presentational attributes, so this is what
+   actually makes it fill. */
+.gt-stage iframe,
+.gt-stage video {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border: 0;
+  object-fit: contain;
+  background: #000;
+}
+
+/* videojs-youtube nests the iframe inside a wrapper div. */
+.gt-stage .vjs-youtube,
+.gt-stage [data-vjs-player],
+.gt-stage [data-vjs-player] > div {
   width: 100%;
   height: 100%;
-  background: black;
-  overflow: hidden;
-  -webkit-overflow-scrolling: touch;
 }
 
-.video-js.vjs-fullscreen,
-.video-wrapper:fullscreen,
-.video-wrapper:-webkit-full-screen,
-.video-wrapper:-moz-full-screen,
-.video-wrapper:-ms-fullscreen {
-  width: 100% !important;
-  height: 100% !important;
-  position: fixed !important;
-  top: 0;
-  left: 0;
-  z-index: 1000;
-}
-
-/* iOS specific styles */
-.video-js.vjs-ios-native {
-  position: relative !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-/* Hide custom controls in fullscreen mode */
-:-webkit-full-screen .custom-controls,
-:-moz-full-screen .custom-controls,
-:-ms-fullscreen .custom-controls,
-:fullscreen .custom-controls {
+/* Video.js's own poster/big-play chrome is replaced by our custom controls. */
+.gt-stage .vjs-poster,
+.gt-stage .vjs-big-play-button,
+.gt-stage .vjs-control-bar,
+.gt-stage .vjs-loading-spinner {
   display: none !important;
 }
 
-/* Mobile-specific adjustments */
-@media (max-width: 768px) {
-  .control-button[aria-label="Fullscreen"] {
-    display: flex !important;
+/* ==========================================================================
+   Reduced motion
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
-
-  .controls-content {
-    padding: 8px;
-    gap: 0.5rem; /* Reduced gap for mobile */
+  .loader-screen.fade-out {
+    transition: none;
   }
-
-  .seek-slider {
-    margin: 0 8px;
-    height: 4px; /* Thinner slider for mobile */
-  }
-
-  .custom-controls {
-    padding: 6px 8px; /* Reduced padding */
-  }
-
-  /* Larger tap targets for mobile */
-  .control-button {
-    min-width: 36px;
-    min-height: 36px;
-  }
-}
-
-/* Ensure proper video sizing */
-.video-js {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: contain;
-}
-
-/* Prevent iOS zooming on double-tap */
-.video-wrapper {
-  touch-action: manipulation;
-}
-
-.video-js.vjs-fullscreen .custom-controls {
-  position: fixed !important;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
-  border-radius: 0;
-  background: rgba(27, 24, 39, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  padding: 16px 32px;
-  border-top: 1px solid rgba(167, 139, 250, 0.2);
-  z-index: 2147483647 !important;
-}
-
-.controls-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  width: 100%;
-  gap: 0.5rem;
-}
-
-.controls-content::-webkit-scrollbar {
-  display: none;
-}
-
-.video-js.vjs-waiting .custom-controls {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.control-button {
-  background: rgba(167, 139, 250, 0.15);
-  color: #f3f3f3;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: "Mona Sans", sans-serif;
-  font-weight: 500;
-  font-size: 0.9rem;
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  flex-shrink: 0;
-}
-
-.control-button:hover {
-  background: rgba(167, 139, 250, 0.3);
-  border-color: rgba(167, 139, 250, 0.4);
-  transform: translateY(-1px);
-}
-
-.control-button:active {
-  transform: translateY(0);
-}
-
-.control-button svg {
-  width: 18px;
-  height: 18px;
-}
-
-.seek-slider {
-  flex: 1;
-  min-width: 100px;
-  max-width: 100%;
-  height: 6px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
-  outline: none;
-  transition: all 0.2s ease;
-}
-
-.seek-slider:hover {
-  height: 8px;
-}
-
-.seek-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 16px;
-  width: 16px;
-  background: #a78bfa;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(167, 139, 250, 0.4);
-}
-
-.seek-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
-  background: #c084fc;
-}
-
-.seek-slider::-moz-range-thumb {
-  height: 16px;
-  width: 16px;
-  background: #a78bfa;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(167, 139, 250, 0.4);
-}
-
-.seek-slider::-moz-range-thumb:hover {
-  transform: scale(1.1);
-  background: #c084fc;
-}
-
-.time-display {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.9rem;
-  font-weight: 500;
-  min-width: 8rem;
-  text-align: center;
-  background: rgba(0, 0, 0, 0.2);
-  padding: 4px 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(4px);
-  flex-shrink: 0;
-}
-
-/* ========== Video Info ========== */
-.video-info {
-  flex: 1;
-  text-align: left;
-}
-
-.video-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #f5f5f5;
-  margin-bottom: 0.5rem;
-}
-
-.video-meta {
-  color: #ccc;
-  margin-bottom: 1rem;
-  font-size: 0.95rem;
-}
-
-.video-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  font-size: 0.875rem;
-  color: #aaa;
-}
-
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.stat-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-}
-
-.stat-dot.green {
-  background-color: #10b981;
-}
-
-.stat-dot.red {
-  background-color: #ef4444;
-}
-
-.stat-dot.blue {
-  background-color: #3b82f6;
-}
-
-.video-description {
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.description-title {
-  font-size: 1.125rem;
-  font-weight: 500;
-  color: #e5e5e5;
-  margin-bottom: 0.5rem;
-}
-
-.description-text {
-  color: #aaa;
-  font-size: 0.875rem;
-  line-height: 1.6;
-}
-
-/* ========== Auth Components ========== */
-.auth-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background: linear-gradient(to right, rgb(40, 23, 46), #1b1827);
-  padding: 2rem;
-}
-
-.auth-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  border-radius: 1rem;
-  padding: 2rem;
-  width: 100%;
-  max-width: 400px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.auth-title {
-  color: #f3f3f3;
-  text-align: center;
-  margin-bottom: 1.5rem;
-  font-size: 1.5rem;
-}
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.input-group {
-  display: flex;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 0.5rem;
-  padding: 0.5rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.input-icon {
-  color: #a78bfa;
-  margin-right: 0.5rem;
-}
-
-.auth-input {
-  background: transparent;
-  border: none;
-  color: #f3f3f3;
-  padding: 0.5rem 0;
-  width: 100%;
-  outline: none;
-}
-
-.auth-input::placeholder {
-  color: #bbb;
-}
-
-.auth-button {
-  background: linear-gradient(135deg, #a78bfa, #7c3aed);
-  color: white;
-  border: none;
-  border-radius: 0.5rem;
-  padding: 0.75rem;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.auth-button:hover {
-  background: linear-gradient(135deg, #c084fc, #a78bfa);
-}
-
-.auth-switch {
-  color: #ccc;
-  text-align: center;
-  margin-top: 1rem;
-}
-
-.auth-link {
-  color: #a78bfa;
-  text-decoration: none;
-}
-
-.auth-error {
-  color: #ef4444;
-  text-align: center;
-  margin-bottom: 1rem;
-}
-
-/* ========== Profile Components ========== */
-.profile-dropdown {
-  position: relative;
-}
-
-.profile {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-
-.profile-image {
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 2px solid #a78bfa;
-  cursor: pointer;
-  transition: border-color 0.2s ease;
-  object-fit: cover;
-}
-
-.profile:hover {
-  border-color: #c084fc;
-}
-
-.profile-details {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
-  align-items: center;
-}
-
-.profile-name {
-  font-weight: bold;
-  font-size: 1.125rem;
-  color: #7c3aed;
-  text-transform: capitalize;
-}
-
-.dropdown-menu {
-  position: absolute;
-  right: 10rem;
-  top: 100%;
-  background: rgba(40, 23, 46, 0.9);
-  backdrop-filter: blur(12px);
-  border-radius: 0.5rem;
-  padding: 0.5rem;
-  min-width: 150px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  z-index: 100;
-  display: none;
-}
-
-.profile-dropdown:hover .dropdown-menu {
-  display: block;
-}
-
-.dropdown-item {
-  width: 100%;
-  text-align: left;
-  padding: 0.5rem 1rem;
-  background: transparent;
-  border: none;
-  color: #f3f3f3;
-  cursor: pointer;
-  border-radius: 0.25rem;
-  font-size: 1rem;
-}
-
-.dropdown-item:hover {
-  background: rgba(167, 139, 250, 0.2);
-}
-
-/* ========== Auth Buttons ========== */
-.auth-buttons {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.auth-buttons .auth-button {
-  display: flex;
-  justify-content: center; /* center horizontally */
-  align-items: center; /* center vertically */
-  text-align: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  background: rgba(167, 139, 250, 0.15);
-  color: #f3f3f3;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  text-decoration: none;
-  font-size: 1rem; /* add for consistency */
-  line-height: 1; /* fix vertical alignment */
-  white-space: nowrap;
-}
-
-.auth-buttons .auth-button svg {
-  flex-shrink: 0;
-  margin-bottom: 0.05rem; /* tiny adjustment to center icon vertically */
-}
-
-.auth-buttons .auth-button:hover {
-  background: rgba(167, 139, 250, 0.3);
-}
-
-.auth-buttons .signup {
-  background: linear-gradient(135deg, #a78bfa, #7c3aed);
-}
-
-.auth-buttons .signup:hover {
-  background: linear-gradient(135deg, #c084fc, #a78bfa);
-}
-
-/* ========== Mobile Navigation ========== */
-.hamburger {
-  display: none;
-  flex-direction: column;
-  justify-content: space-between;
-  width: 32px;
-  height: 24px;
-  background: rgba(167, 139, 250, 0.15);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 6px;
-  cursor: pointer;
-  margin-left: auto;
-  transition: all 0.3s ease;
-}
-
-.hamburger:hover {
-  background: rgba(167, 139, 250, 0.3);
-}
-
-.hamburger .bar {
-  height: 3px;
-  width: 100%;
-  background: #e5e5ff;
-  border-radius: 2px;
-}
-
-/* ========== Responsive Styles ========== */
-@media (max-width: 768px) {
-  /* Navigation */
-  .navbar {
-    width: 100vw;
-    max-width: 100vw;
-    margin: 0;
-    padding: 0;
-    border-radius: 0;
-  }
-
-  .nav-container {
-    width: 100vw;
-    max-width: 100vw;
-    margin: 0;
-    padding: 0;
-    border-radius: 0;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .nav-items {
-    position: relative;
-    top: 0;
-    right: 0;
-    left: 0;
-    width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(12px);
-    border-radius: 1rem;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-    padding: 1rem;
-    display: none;
-    flex-direction: column;
-    gap: 1rem;
-    z-index: 999;
-  }
-
-  .nav-items.open {
-    display: flex;
-  }
-
-  .logo-section {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .hamburger {
-    display: flex;
-  }
-
-  .search-bar {
-    width: 100%;
-  }
-
-  .search-input {
-    min-width: 15rem;
-  }
-
-  .video-player-container {
-    width: 100vw;
-    max-width: 100vw;
-    margin: 0;
-    padding: 0;
-    border-radius: 0;
-  }
-
-  .content-wrapper {
-    width: 100vw;
-    max-width: 100vw;
-    min-height: 100vh;
-    margin: 0;
-    padding: 0;
-    border-radius: 0;
-  }
-
-  .video-section {
-    width: 100vw;
-    max-width: 100vw;
-    min-height: 100vh;
-    margin: 0;
-    padding: 0.7rem;
-    border-radius: 0;
-  }
-
-  .video-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    width: 100%;
-    height: 300px;
-  }
-
-  .controls-content button {
-    font-size: 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 5px;
-    gap: 0.2rem;
-  }
-
-  /* Video Layout */
-  .video-and-info {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .video-stats {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  /* Auth Buttons */
-  .auth-buttons,
-  .profile-dropdown {
-    width: 100%;
-  }
-
-  .auth-button,
-  .dropdown-item {
-    width: 100%;
-    text-align: left;
-    background: rgba(167, 139, 250, 0.1);
-    border-radius: 8px;
-    padding: 0.5rem 1rem;
-    color: #eee;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .auth-button:hover,
-  .dropdown-item:hover {
-    background: rgba(167, 139, 250, 0.2);
-  }
-
-  /* Video Controls */
-  .controls-content {
-    gap: 0.5rem;
-  }
-
-  .control-button {
-    padding: 6px 10px;
-    font-size: 0.8rem;
-  }
-
-  .time-display {
-    min-width: auto;
-    font-size: 0.8rem;
-  }
-}
-
-@media (max-width: 576px) {
-  /* Video Controls - Extra Small Screens */
-  .control-button span {
-    display: none;
-  }
-
-  .control-button {
-    padding: 6px;
-    border-radius: 50%;
-  }
-
-  .time-display {
-    font-size: 0.7rem;
-    padding: 2px 4px;
-  }
-
-  /* Video Info */
-  .video-title {
-    font-size: 1.1rem;
+  /* Content must still be visible — reveals are an enhancement, never a
+     precondition for reading the page. */
+  .reveal {
+    opacity: 1;
+    transform: none;
   }
 }
