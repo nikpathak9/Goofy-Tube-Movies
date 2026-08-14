@@ -4,6 +4,7 @@ import { Lock, Mail, AlertCircle } from "lucide-react";
 import AuthLayout, { AuthField } from "./AuthLayout";
 import { useAuth } from "../lib/useAuth";
 import { authStorageError, findAccount, readAccounts } from "../lib/authStorage";
+import Seo from "./Seo";
 
 const SignIn = () => {
   const [email, setEmail] = useState("");
@@ -48,22 +49,29 @@ const SignIn = () => {
   };
 
   return (
-    <AuthLayout
-      title="Welcome back"
-      subtitle="Sign in to pick up where you left off."
-      footer={
-        <>
-          Don&rsquo;t have an account?{" "}
-          <Link
-            to="/signup"
-            state={{ from: returnTo }}
-            className="font-medium text-accent transition hover:text-accent-hover"
-          >
-            Sign up
-          </Link>
-        </>
-      }
-    >
+    <>
+      <Seo
+        title="Sign in"
+        description="Sign in to your Goofy Tube profile."
+        path="/signin"
+        noIndex
+      />
+      <AuthLayout
+        title="Welcome back"
+        subtitle="Sign in to pick up where you left off."
+        footer={
+          <>
+            Don&rsquo;t have an account?{" "}
+            <Link
+              to="/signup"
+              state={{ from: returnTo }}
+              className="font-medium text-accent transition hover:text-accent-hover"
+            >
+              Sign up
+            </Link>
+          </>
+        }
+      >
       {error && (
         <div
           role="alert"
@@ -120,7 +128,8 @@ const SignIn = () => {
         Demo accounts are stored locally in this browser only. Don&rsquo;t use a
         real password.
       </p>
-    </AuthLayout>
+      </AuthLayout>
+    </>
   );
 };
 

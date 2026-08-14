@@ -6,6 +6,7 @@ import Reveal from "./Reveal";
 import { isPlayableType, titleOf } from "../lib/media";
 import { useWatchlist } from "../lib/useWatchlist";
 import { useAuth } from "../lib/useAuth";
+import Seo from "./Seo";
 
 const API_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -117,6 +118,12 @@ const Profile = () => {
 
   return (
     <main className="min-h-[70vh] px-4 pb-16 pt-10 md:px-10">
+      <Seo
+        title="Your Profile"
+        description="Manage your Goofy Tube profile and saved watch list."
+        path="/profile"
+        noIndex
+      />
       <section className="flex flex-col gap-6 border-b border-hairline pb-10 sm:flex-row sm:items-center">
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full bg-accent text-white ring-1 ring-hairline-strong">
           {user.profileImage ? <img src={user.profileImage} alt={`${user.name || "User"} profile`} className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center text-3xl font-semibold" aria-hidden="true">{(user.name || "?").charAt(0).toUpperCase()}</span>}

@@ -26,6 +26,7 @@ import {
 } from "../redux/slices/videoSlice";
 import MediaRail from "./MediaRail";
 import { isPlayableType, titleOf } from "../lib/media";
+import Seo from "./Seo";
 
 const CONTROLS_HIDE_DELAY = 3000;
 const SEEK_STEP = 10;
@@ -460,6 +461,16 @@ const VideoPlayer = () => {
   if (!isLoading && (error || !trailerUrl)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-base px-4 text-center">
+        <Seo
+          title={title ? `Watch ${title}` : "Trailer unavailable"}
+          description={
+            title
+              ? `Watch the trailer for ${title} on Goofy Tube.`
+              : "This trailer is not currently available on Goofy Tube."
+          }
+          path={`/watch/${type}/${id}`}
+          noIndex
+        />
         <AlertTriangle size={36} className="text-faint" aria-hidden="true" />
         <h1 className="mt-5 text-h1 text-ink">
           {error ? "Playback problem" : "No trailer available"}
@@ -502,6 +513,16 @@ const VideoPlayer = () => {
 
   return (
     <main className="px-4 py-6 md:px-10 md:py-8">
+      <Seo
+        title={title ? `Watch ${title}` : "Watch trailer"}
+        description={
+          title
+            ? `Watch the trailer for ${title} on Goofy Tube.`
+            : "Watch movie and series trailers on Goofy Tube."
+        }
+        path={`/watch/${type}/${id}`}
+        noIndex
+      />
       <div className="mx-auto max-w-[1200px]">
         {!isFullScreen && (
           <div className="mb-5 flex items-center justify-between gap-4">

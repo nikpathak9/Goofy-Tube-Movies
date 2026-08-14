@@ -11,6 +11,8 @@ import {
 import HeroCarousel from "./HeroCarousel";
 import GenreFilter from "./GenreFilter";
 import MediaRail from "./MediaRail";
+import Seo from "./Seo";
+import { absoluteSiteUrl } from "../lib/seo";
 
 const API_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -113,6 +115,17 @@ const Homepage = () => {
 
   return (
     <main>
+      <Seo
+        description="Discover popular and top-rated movies and TV shows, watch trailers, and build your watch list on Goofy Tube."
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "Goofy Tube",
+          url: absoluteSiteUrl("/"),
+          description:
+            "Discover popular and top-rated movies and TV shows, watch trailers, and build your watch list.",
+        }}
+      />
       <HeroCarousel />
 
       <GenreFilter />

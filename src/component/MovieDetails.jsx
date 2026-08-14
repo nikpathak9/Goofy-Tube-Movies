@@ -7,6 +7,8 @@ import Reveal from "./Reveal";
 import { isPlayableType, titleOf, ratingOf } from "../lib/media";
 import { profileImage, backdropUrl } from "../lib/images";
 import { useWatchlist } from "../lib/useWatchlist";
+import Seo from "./Seo";
+import { absoluteSiteUrl, seoDescription } from "../lib/seo";
 
 const CACHE_TTL = 3600 * 1000; // 1 hour
 const MAX_MEDIA_CACHE_ENTRIES = 12;
@@ -285,20 +287,34 @@ const MovieDetails = () => {
 
   if (loading) {
     return (
-      <div className="pt-16">
-        <div className="skeleton h-[52vh] w-full" />
-        <div className="mx-auto max-w-6xl space-y-3 px-4 py-8 md:px-10">
-          <div className="skeleton h-8 w-1/3 rounded" />
-          <div className="skeleton h-4 w-2/3 rounded" />
-          <div className="skeleton h-4 w-1/2 rounded" />
+      <>
+        <Seo
+          title="Loading title"
+          description="Loading movie or series details on Goofy Tube."
+          path={`/details/${type}/${id}`}
+          noIndex
+        />
+        <div className="pt-16">
+          <div className="skeleton h-[52vh] w-full" />
+          <div className="mx-auto max-w-6xl space-y-3 px-4 py-8 md:px-10">
+            <div className="skeleton h-8 w-1/3 rounded" />
+            <div className="skeleton h-4 w-2/3 rounded" />
+            <div className="skeleton h-4 w-1/2 rounded" />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (notFound || !media) {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
+        <Seo
+          title="Title not found"
+          description="The requested movie or series could not be found on Goofy Tube."
+          path={`/details/${type}/${id}`}
+          noIndex
+        />
         <h1 className="text-h1 text-ink">Title not found</h1>
         <p className="mt-2 text-body text-muted">
           We couldn&rsquo;t find anything at that address.
@@ -316,8 +332,73 @@ const MovieDetails = () => {
   const title = titleOf(media);
   const rating = ratingOf(media);
   const backdrop = backdropUrl(media.backdrop_path || media.poster_path);
+  const seoImage = backdropUrl(
+    media.backdrop_path || media.poster_path,
+    "w1280"
+  );
   const directorNames = [...new Set(directors.map((d) => d.name))].slice(0, 3);
   const year = (media.release_date || media.first_air_date || "").slice(0, 4);
+  const releaseDate = media.release_date || media.first_air_date || undefined;
+  const detailsUrl = absoluteSiteUrl(`/details/${type}/${id}`);
+  const detailsDescription = seoDescription(
+    media.overview,
+    `${title} is available to discover on Goofy Tube.`
+  );
+  const mediaSchema = {
+    "@type": type === "movie" ? "Movie" : "TVSeries",
+    name: title,
+    url: detailsUrl,
+    description: detailsDescription,
+    image: seoImage || undefined,
+    datePublished: releaseDate,
+    genre: media.genres?.map((genre) => genre.name),
+    inLanguage: media.original_language || undefined,
+    director: directorNames.map((name) => ({ "@type": "Person", name })),
+    actor: cast.slice(0, 8).map((person) => ({
+      "@type": "Person",
+      name: person.name,
+    })),
+    aggregateRating:
+      rating && media.vote_count
+        ? {
+            "@type": "AggregateRating",
+            ratingValue: Number(rating),
+            bestRating: 10,
+            worstRating: 0,
+            ratingCount: media.vote_count,
+          }
+        : undefined,
+    sameAs: `https://www.themoviedb.org/${type}/${id}`,
+  };
+  const detailsJsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      mediaSchema,
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Home",
+            item: absoluteSiteUrl("/"),
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: type === "movie" ? "Movies" : "Series",
+            item: absoluteSiteUrl(`/browse/${type}`),
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: title,
+            item: detailsUrl,
+          },
+        ],
+      },
+    ],
+  };
 
   // Bullet-separated meta row: 2026 • 2h 08m • Sci-Fi Thriller • 16+
   const metaParts = [
@@ -377,6 +458,15 @@ const MovieDetails = () => {
 
   return (
     <div>
+      <Seo
+        title={`${title}${year ? ` (${year})` : ""}`}
+        description={detailsDescription}
+        path={`/details/${type}/${id}`}
+        image={seoImage || "/GT-logo.png"}
+        imageAlt={`${title} backdrop`}
+        type={type === "movie" ? "video.movie" : "video.tv_show"}
+        jsonLd={detailsJsonLd}
+      />
       {/* ---------- Hero ---------- */}
       <section className="relative">
         {/*

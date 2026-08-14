@@ -4,6 +4,7 @@ import { SearchX } from "lucide-react";
 import MediaCard from "./MediaCard";
 import Reveal from "./Reveal";
 import { detailsPath } from "../lib/media";
+import Seo from "./Seo";
 
 const FILTERS = [
   ["all", "All"],
@@ -97,6 +98,12 @@ const SearchPage = () => {
 
   return (
     <main className="mx-auto max-w-7xl px-4 pb-16 pt-24 md:px-10 md:pt-28">
+      <Seo
+        title={`Search: ${decodedQuery || "Movies and series"}`}
+        description={`Search results for ${decodedQuery || "movies and series"} on Goofy Tube.`}
+        path={`/search/${encodeURIComponent(decodedQuery)}`}
+        noIndex
+      />
       <h1 className="text-h1 text-ink">
         Results for &ldquo;{decodedQuery}&rdquo;
       </h1>

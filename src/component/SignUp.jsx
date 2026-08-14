@@ -10,6 +10,7 @@ import {
   readAccounts,
   writeAccounts,
 } from "../lib/authStorage";
+import Seo from "./Seo";
 
 /** Cheap, honest strength signal — no library needed. */
 function scorePassword(pw) {
@@ -95,22 +96,29 @@ const SignUp = () => {
   };
 
   return (
-    <AuthLayout
-      title="Create your account"
-      subtitle="It takes about ten seconds."
-      footer={
-        <>
-          Already have an account?{" "}
-          <Link
-            to="/signin"
-            state={{ from: returnTo }}
-            className="font-medium text-accent transition hover:text-accent-hover"
-          >
-            Sign in
-          </Link>
-        </>
-      }
-    >
+    <>
+      <Seo
+        title="Create an account"
+        description="Create a Goofy Tube profile to save your watch list."
+        path="/signup"
+        noIndex
+      />
+      <AuthLayout
+        title="Create your account"
+        subtitle="It takes about ten seconds."
+        footer={
+          <>
+            Already have an account?{" "}
+            <Link
+              to="/signin"
+              state={{ from: returnTo }}
+              className="font-medium text-accent transition hover:text-accent-hover"
+            >
+              Sign in
+            </Link>
+          </>
+        }
+      >
       {error && (
         <div
           role="alert"
@@ -185,7 +193,8 @@ const SignUp = () => {
         Demo accounts are stored locally in this browser only. Don&rsquo;t use a
         real password.
       </p>
-    </AuthLayout>
+      </AuthLayout>
+    </>
   );
 };
 

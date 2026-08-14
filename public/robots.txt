@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://goofy-tube-movies.netlify.app/sitemap.xml

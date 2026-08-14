@@ -4,6 +4,7 @@ import MediaCard from "./MediaCard";
 import Reveal from "./Reveal";
 import BrowseSkeleton from "./BrowseSkeleton";
 import { isPlayableType } from "../lib/media";
+import Seo from "./Seo";
 
 const API_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -181,6 +182,11 @@ const Browse = () => {
 
   return (
     <main className="px-4 pb-16 pt-8 md:px-10">
+      <Seo
+        title={`Browse ${heading}`}
+        description={`Browse popular, top-rated, and new ${heading.toLowerCase()} on Goofy Tube. Filter by genre and find your next title to watch.`}
+        path={`/browse/${type}`}
+      />
       <p className="eyebrow">Browse</p>
       <h1 className="mt-2 display-title text-h1 text-ink md:text-display">
         {heading}
