@@ -6,7 +6,8 @@ import {
   Home,
   Film,
   Tv,
-  ChevronRight,
+  ArrowUpRight,
+  Command,
 } from "lucide-react";
 import SearchPalette from "./SearchPalette";
 import { useRetractableNav } from "../lib/useRetractableNav";
@@ -26,6 +27,7 @@ const Navbar = () => {
   // Peek = temporarily expanded while hovered/focused/tapped in compact mode.
   const [peek, setPeek] = useState(false);
   const peekCloseTimer = useRef(null);
+  const burgerRef = useRef(null);
   const { collapsed, atTop } = useRetractableNav();
   const reduced = useReducedMotion();
   const location = useLocation();
@@ -45,12 +47,18 @@ const Navbar = () => {
     const onKey = (e) => {
       if (e.key === "Escape") setMobileOpen(false);
     };
+    // Captured now: the ref is read in cleanup, by which point React may have
+    // reassigned it.
+    const opener = burgerRef.current;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", onKey);
+      // Send focus back to the control that opened the menu, rather than
+      // dropping it at the top of the document.
+      opener?.focus();
     };
   }, [mobileOpen]);
 
@@ -203,6 +211,7 @@ const Navbar = () => {
               the nav links use.
             */}
             <button
+              ref={burgerRef}
               onClick={() => setMobileOpen((v) => !v)}
               aria-label={mobileOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileOpen}
@@ -223,129 +232,158 @@ const Navbar = () => {
           </div>
         </header>
 
-        {/* Mobile nav sheet */}
-        {mobileOpen && (
-          <>
-            {/* Tap-anywhere-to-dismiss scrim. Sits under the sheet but over
-                the page, and dims the content so the menu reads as a layer. */}
-            <div
-              className="fixed inset-0 -z-10 bg-base/60 backdrop-blur-sm md:hidden"
-              onClick={() => setMobileOpen(false)}
-              aria-hidden="true"
-            />
-
-            {/*
-              Absolutely positioned, NOT in flow.
-
-              As a static block inside the sticky wrapper the sheet added its
-              own height to that wrapper (68px -> 342px), which shoved the hero
-              and the entire page down by ~274px every time the menu opened.
-              Taking it out of flow means it overlays the page instead.
-
-              `top-full` anchors it to the bottom edge of the sticky wrapper —
-              i.e. directly under the bar — and left/right-3 match the
-              wrapper's px-3 so it lines up with the header pill.
-            */}
-            <div
-              id="mobile-menu"
-              className="gt-menu-sheet absolute left-3 right-3 top-full mt-2
-                         overflow-hidden rounded-sheet border border-hairline
-                         bg-surface/95 p-1.5 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.8)]
-                         backdrop-blur-xl md:hidden"
-            >
-              <p className="eyebrow px-3 pb-1.5 pt-2">Menu</p>
-
-              {NAV_LINKS.map((link, i) => {
-                const Icon = link.icon;
-                return (
-                  <NavLink
-                    key={link.to}
-                    to={link.to}
-                    end={link.end}
-                    style={{ "--item-delay": `${60 + i * 45}ms` }}
-                    className={({ isActive }) =>
-                      `gt-menu-item group flex items-center gap-3 rounded-xl px-3 py-3
-                       text-sm font-medium transition duration-150 ${
-                         isActive
-                           ? "bg-accent-soft text-accent-hover"
-                           : "text-muted hover:bg-white/5 hover:text-ink"
-                       }`
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <span
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center
-                                      rounded-lg border transition ${
-                                        isActive
-                                          ? "border-accent/40 bg-accent/15 text-accent-hover"
-                                          : "border-hairline bg-white/5 text-muted group-hover:text-ink"
-                                      }`}
-                        >
-                          <Icon size={15} aria-hidden="true" />
-                        </span>
-                        <span className="flex-1">{link.label}</span>
-                        {/* Active row gets a solid dot; the rest get a chevron
-                            that nudges on press. */}
-                        {isActive ? (
-                          <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
-                        ) : (
-                          <ChevronRight
-                            size={15}
-                            className="text-faint transition-transform duration-150 group-hover:translate-x-0.5"
-                            aria-hidden="true"
-                          />
-                        )}
-                      </>
-                    )}
-                  </NavLink>
-                );
-              })}
-
-              <div className="mx-3 my-1.5 h-px bg-hairline" />
-
-              {user ? (
-                <Link
-                  to="/profile"
-                  style={{ "--item-delay": `${60 + NAV_LINKS.length * 45}ms` }}
-                  className="gt-menu-item group flex items-center gap-3 rounded-xl px-3 py-3
-                             text-sm font-medium text-ink transition hover:bg-white/5"
-                >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-accent text-caption font-semibold text-white">
-                    {user.profileImage ? (
-                      <img src={user.profileImage} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      (user.name || "?").charAt(0).toUpperCase()
-                    )}
-                  </span>
-                  <span className="flex-1">
-                    {user.name || "Profile"}
-                    <span className="block text-[11px] font-normal text-faint">
-                      Profile &amp; watch list
-                    </span>
-                  </span>
-                  <ChevronRight
-                    size={15}
-                    className="text-faint transition-transform duration-150 group-hover:translate-x-0.5"
-                    aria-hidden="true"
-                  />
-                </Link>
-              ) : (
-                <Link
-                  to="/signin"
-                  style={{ "--item-delay": `${60 + NAV_LINKS.length * 45}ms` }}
-                  className="gt-menu-item flex items-center justify-center gap-2 rounded-xl
-                             bg-accent px-3 py-3 text-sm font-semibold text-white
-                             transition duration-200 hover:bg-accent-hover"
-                >
-                  <LogIn size={15} aria-hidden="true" />
-                  Sign In
-                </Link>
-              )}
-            </div>
-          </>
-        )}
       </div>
+
+      {/*
+        Full-screen menu overlay.
+
+        Rendered OUTSIDE the sticky wrapper so it isn't confined by that
+        element's stacking context, and `fixed inset-0` keeps it entirely out
+        of flow — the page underneath cannot be pushed or reflowed.
+
+        The previous dropdown panel read as a generic menu widget. Oversized
+        uppercase links mirror the hero's display treatment, which is the most
+        distinctive thing about the site.
+      */}
+      {mobileOpen && (
+        <div
+          className="gt-menu-overlay fixed inset-0 z-[60] flex flex-col bg-base/97
+                     backdrop-blur-2xl md:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+        >
+          {/* Decorative bloom for depth behind the type. */}
+          <div className="gt-menu-glow pointer-events-none absolute inset-0" aria-hidden="true" />
+
+          {/* Header row mirrors the nav bar so the close control sits exactly
+              where the burger was — no visual jump. */}
+          <div className="relative flex h-14 shrink-0 items-center justify-between px-6 pt-3">
+            <span className="text-[0.9rem] font-extrabold uppercase tracking-[0.14em] text-ink">
+              Goofy<span className="text-accent">Tube</span>
+            </span>
+            <button
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close menu"
+              className="flex h-9 w-9 items-center justify-center rounded-full border
+                         border-accent/50 bg-accent-soft text-accent-hover transition
+                         hover:bg-accent/25"
+            >
+              <span className="gt-burger" data-open="true" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            </button>
+          </div>
+
+          {/* --- Oversized links --- */}
+          <nav className="relative flex-1 overflow-y-auto px-6 pt-8" aria-label="Mobile">
+            {NAV_LINKS.map((link, i) => (
+              <div key={link.to}>
+                <NavLink
+                  to={link.to}
+                  end={link.end}
+                  style={{ "--item-delay": `${90 + i * 70}ms` }}
+                  className={({ isActive }) =>
+                    `gt-menu-item group flex items-baseline gap-4 py-4 transition-colors
+                     duration-200 ${isActive ? "text-accent" : "text-ink hover:text-accent-hover"}`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span
+                        className={`w-6 shrink-0 text-[11px] font-semibold tabular-nums tracking-widest
+                                    ${isActive ? "text-accent" : "text-faint"}`}
+                        aria-hidden="true"
+                      >
+                        0{i + 1}
+                      </span>
+                      <span className="display-title flex-1 text-[2.6rem] leading-none">
+                        {link.label}
+                      </span>
+                      <ArrowUpRight
+                        size={22}
+                        aria-hidden="true"
+                        className={`shrink-0 transition-transform duration-200
+                                    group-hover:translate-x-1 group-hover:-translate-y-1
+                                    ${isActive ? "text-accent" : "text-faint"}`}
+                      />
+                    </>
+                  )}
+                </NavLink>
+                <div
+                  className="gt-menu-rule h-px bg-hairline"
+                  style={{ "--item-delay": `${90 + i * 70}ms` }}
+                  aria-hidden="true"
+                />
+              </div>
+            ))}
+
+            {/* Search gets a row of its own — it was only reachable from the
+                bar, which the overlay covers. */}
+            <button
+              onClick={() => {
+                setMobileOpen(false);
+                setPaletteOpen(true);
+              }}
+              style={{ "--item-delay": `${90 + NAV_LINKS.length * 70}ms` }}
+              className="gt-menu-item group mt-6 flex w-full items-center gap-3 rounded-2xl
+                         border border-hairline bg-white/[0.04] px-4 py-3.5 text-left
+                         transition duration-200 hover:border-hairline-strong hover:bg-white/[0.07]"
+            >
+              <Search size={17} className="shrink-0 text-muted" aria-hidden="true" />
+              <span className="flex-1 text-sm text-muted">Search titles…</span>
+              <kbd className="flex items-center gap-0.5 rounded border border-hairline px-1.5 py-0.5 text-[10px] text-faint">
+                <Command size={9} aria-hidden="true" />K
+              </kbd>
+            </button>
+          </nav>
+
+          {/* --- Account --- */}
+          <div
+            className="relative shrink-0 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4"
+            style={{ "--item-delay": `${90 + (NAV_LINKS.length + 1) * 70}ms` }}
+          >
+            {user ? (
+              <Link
+                to="/profile"
+                className="gt-menu-item flex items-center gap-3 rounded-2xl border
+                           border-hairline bg-white/[0.04] p-3 transition hover:bg-white/[0.08]"
+                style={{ "--item-delay": `${90 + (NAV_LINKS.length + 1) * 70}ms` }}
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent text-sm font-semibold text-white">
+                  {user.profileImage ? (
+                    <img src={user.profileImage} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    (user.name || "?").charAt(0).toUpperCase()
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-ink">
+                    {user.name || "Profile"}
+                  </span>
+                  <span className="block text-[11px] text-faint">
+                    Profile &amp; watch list
+                  </span>
+                </span>
+                <ArrowUpRight size={18} className="shrink-0 text-faint" aria-hidden="true" />
+              </Link>
+            ) : (
+              <Link
+                to="/signin"
+                className="gt-menu-item flex items-center justify-center gap-2 rounded-full
+                           bg-accent py-3.5 text-sm font-semibold text-white transition
+                           duration-200 hover:bg-accent-hover"
+                style={{ "--item-delay": `${90 + (NAV_LINKS.length + 1) * 70}ms` }}
+              >
+                <LogIn size={16} aria-hidden="true" />
+                Sign In
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
 
       <SearchPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </>

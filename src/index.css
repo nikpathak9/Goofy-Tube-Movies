@@ -746,38 +746,62 @@
   transform: translateY(-5.25px) rotate(-45deg);
 }
 
-/* Menu sheet: scale + lift from the button it belongs to. */
-.gt-menu-sheet {
-  transform-origin: top right;
-  animation: gt-menu-in var(--duration-expand) var(--ease-emphasis) both;
+/* --- Full-screen menu overlay ------------------------------------------
+   The dropdown-panel version read as a generic menu widget. A full-viewport
+   overlay with oversized uppercase links echoes the hero's display treatment,
+   which is the most recognisable thing about the site. */
+
+.gt-menu-overlay {
+  animation: gt-overlay-in var(--duration-base) var(--ease-out-soft) both;
 }
 
-@keyframes gt-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-8px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+@keyframes gt-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-/* Rows cascade in behind the sheet. */
+/* Each row rises independently so the list reads top-to-bottom. */
 .gt-menu-item {
-  animation: gt-menu-item-in var(--duration-base) var(--ease-out-soft) both;
+  animation: gt-menu-item-in 520ms var(--ease-emphasis) both;
   animation-delay: var(--item-delay, 0ms);
 }
 
 @keyframes gt-menu-item-in {
   from {
     opacity: 0;
-    transform: translateX(-6px);
+    transform: translateY(22px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
+}
+
+/* Hairline that wipes in beneath each row as it arrives. */
+.gt-menu-rule {
+  transform-origin: left center;
+  animation: gt-rule-in 640ms var(--ease-emphasis) both;
+  animation-delay: var(--item-delay, 0ms);
+}
+
+@keyframes gt-rule-in {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* Ambient accent bloom, purely decorative depth behind the type. */
+.gt-menu-glow {
+  background: radial-gradient(
+    45% 40% at 85% 8%,
+    rgba(225, 29, 46, 0.28) 0%,
+    transparent 70%
+  );
+  animation: gt-glow-in 900ms var(--ease-out-soft) both;
+}
+
+@keyframes gt-glow-in {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -800,8 +824,10 @@
   }
   /* The burger still becomes an X — that's state, not decoration. Only the
      entrance choreography is dropped. */
-  .gt-menu-sheet,
-  .gt-menu-item {
+  .gt-menu-overlay,
+  .gt-menu-item,
+  .gt-menu-rule,
+  .gt-menu-glow {
     animation: none;
     opacity: 1;
     transform: none;
