@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Lock, Mail, User, AlertCircle } from "lucide-react";
 import AuthLayout, { AuthField } from "./AuthLayout";
 import { useAuth } from "../lib/useAuth";
+import { accountExists, normalizeEmail, readAccounts } from "../lib/authStorage";
 
 /** Cheap, honest strength signal — no library needed. */
 function scorePassword(pw) {
@@ -63,13 +64,13 @@ const SignUp = () => {
     try {
       await new Promise((resolve) => setTimeout(resolve, 600));
 
-      const users = JSON.parse(localStorage.getItem("users") || "[]");
-      if (users.find((u) => u.email === email.trim())) {
+      const users = readAccounts();
+      if (accountExists(users, email)) {
         setError("An account with that email already exists.");
         return;
       }
 
-      const newUser = { name: name.trim(), email: email.trim(), password };
+      const newUser = { name: name.trim(), email: normalizeEmail(email), password };
       users.push(newUser);
       localStorage.setItem("users", JSON.stringify(users));
       setUser(newUser);

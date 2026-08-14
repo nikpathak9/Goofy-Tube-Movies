@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Lock, Mail, AlertCircle } from "lucide-react";
 import AuthLayout, { AuthField } from "./AuthLayout";
 import { useAuth } from "../lib/useAuth";
+import { findAccount, readAccounts } from "../lib/authStorage";
 
 const SignIn = () => {
   const [email, setEmail] = useState("");
@@ -24,10 +25,13 @@ const SignIn = () => {
     try {
       await new Promise((resolve) => setTimeout(resolve, 600));
 
-      const users = JSON.parse(localStorage.getItem("users") || "[]");
-      const matchedUser = users.find(
-        (u) => u.email === email.trim() && u.password === password
-      );
+      const users = readAccounts();
+      if (!users.length) {
+        setError("No account was found in this browser. Create an account first.");
+        return;
+      }
+
+      const matchedUser = findAccount(users, email, password);
 
       if (!matchedUser) {
         setError("Invalid email or password.");
@@ -76,7 +80,10 @@ const SignIn = () => {
           icon={Mail}
           type="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (error) setError("");
+          }}
           placeholder="Email"
           autoComplete="email"
           required
@@ -85,7 +92,10 @@ const SignIn = () => {
           icon={Lock}
           type="password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            if (error) setError("");
+          }}
           placeholder="Password"
           autoComplete="current-password"
           required

@@ -699,6 +699,87 @@
    Reduced motion
    ========================================================================== */
 
+/* ==========================================================================
+   Mobile menu
+
+   The hamburger is three real bars that morph into an X rather than swapping
+   two icons — the middle bar fades out while the outer two rotate into place,
+   so open/close reads as one continuous gesture instead of a hard cut.
+   Transform + opacity only, so it composites on the GPU.
+   ========================================================================== */
+
+.gt-burger {
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 12px;
+}
+
+.gt-burger span {
+  position: absolute;
+  left: 0;
+  height: 1.5px;
+  width: 100%;
+  border-radius: 999px;
+  background: currentColor;
+  transition:
+    transform var(--duration-base) var(--ease-emphasis),
+    opacity var(--duration-fast) var(--ease-out-soft),
+    width var(--duration-base) var(--ease-emphasis);
+}
+
+.gt-burger span:nth-child(1) { top: 0; }
+.gt-burger span:nth-child(2) { top: 5.25px; width: 72%; }
+.gt-burger span:nth-child(3) { top: 10.5px; width: 86%; }
+
+/* Staggered bars are a nice idle detail, but they must line up before
+   rotating — otherwise the X comes out lopsided. */
+.gt-burger[data-open="true"] span:nth-child(1) {
+  transform: translateY(5.25px) rotate(45deg);
+}
+.gt-burger[data-open="true"] span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0.2);
+}
+.gt-burger[data-open="true"] span:nth-child(3) {
+  width: 100%;
+  transform: translateY(-5.25px) rotate(-45deg);
+}
+
+/* Menu sheet: scale + lift from the button it belongs to. */
+.gt-menu-sheet {
+  transform-origin: top right;
+  animation: gt-menu-in var(--duration-expand) var(--ease-emphasis) both;
+}
+
+@keyframes gt-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Rows cascade in behind the sheet. */
+.gt-menu-item {
+  animation: gt-menu-item-in var(--duration-base) var(--ease-out-soft) both;
+  animation-delay: var(--item-delay, 0ms);
+}
+
+@keyframes gt-menu-item-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -714,6 +795,14 @@
   /* Content must still be visible — reveals are an enhancement, never a
      precondition for reading the page. */
   .reveal {
+    opacity: 1;
+    transform: none;
+  }
+  /* The burger still becomes an X — that's state, not decoration. Only the
+     entrance choreography is dropped. */
+  .gt-menu-sheet,
+  .gt-menu-item {
+    animation: none;
     opacity: 1;
     transform: none;
   }
