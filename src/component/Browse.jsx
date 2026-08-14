@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import MediaCard from "./MediaCard";
 import Reveal from "./Reveal";
+import BrowseSkeleton from "./BrowseSkeleton";
 import { isPlayableType } from "../lib/media";
 
 const API_BASE_URL = "https://api.themoviedb.org/3";
@@ -20,6 +21,7 @@ const Browse = () => {
   const { type } = useParams();
   const [items, setItems] = useState([]);
   const [genres, setGenres] = useState([]);
+  const [genresLoading, setGenresLoading] = useState(true);
   const [activeGenre, setActiveGenre] = useState(null);
   const [sort, setSort] = useState("popularity.desc");
   const [page, setPage] = useState(1);
@@ -27,6 +29,10 @@ const Browse = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [loadMoreError, setLoadMoreError] = useState(null);
+  const [retryKey, setRetryKey] = useState(0);
+  const loadMoreRef = useRef(null);
+  const requestLockedRef = useRef(true);
 
   const headers = useCallback(
     () => ({
@@ -40,6 +46,7 @@ const Browse = () => {
   useEffect(() => {
     if (!isPlayableType(type)) return;
     const controller = new AbortController();
+    setGenresLoading(true);
     (async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/genre/${type}/list`, {
@@ -50,6 +57,8 @@ const Browse = () => {
         if (!controller.signal.aborted) setGenres(data.genres || []);
       } catch (err) {
         if (err.name !== "AbortError") console.error(err);
+      } finally {
+        if (!controller.signal.aborted) setGenresLoading(false);
       }
     })();
     return () => controller.abort();
@@ -59,6 +68,9 @@ const Browse = () => {
   useEffect(() => {
     setItems([]);
     setPage(1);
+    setError(null);
+    setLoadMoreError(null);
+    requestLockedRef.current = true;
   }, [type, activeGenre, sort]);
 
   useEffect(() => {
@@ -66,8 +78,9 @@ const Browse = () => {
     const controller = new AbortController();
 
     (async () => {
+      requestLockedRef.current = true;
       page === 1 ? setLoading(true) : setLoadingMore(true);
-      setError(null);
+      page === 1 ? setError(null) : setLoadMoreError(null);
       try {
         const params = new URLSearchParams({
           language: "en-US",
@@ -89,24 +102,71 @@ const Browse = () => {
         if (controller.signal.aborted) return;
 
         setTotalPages(Math.min(data.total_pages || 1, 500));
-        setItems((prev) =>
-          page === 1 ? data.results || [] : [...prev, ...(data.results || [])]
-        );
+        setItems((prev) => {
+          const combined = page === 1
+            ? data.results || []
+            : [...prev, ...(data.results || [])];
+          const seen = new Set();
+          return combined.filter((item) => {
+            if (!item?.id || seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+          });
+        });
       } catch (err) {
         if (err.name !== "AbortError") {
           console.error(err);
-          setError("Couldn't load titles. Please try again.");
+          if (page === 1) {
+            setError("Couldn't load titles. Please try again.");
+          } else {
+            setLoadMoreError("Couldn't load more titles.");
+          }
         }
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
           setLoadingMore(false);
+          requestLockedRef.current = false;
         }
       }
     })();
 
     return () => controller.abort();
-  }, [type, page, sort, activeGenre, headers]);
+  }, [type, page, sort, activeGenre, headers, retryKey]);
+
+  // Request the next page when the end sentinel reaches the viewport.
+  // The synchronous ref lock prevents repeated observer notifications from
+  // incrementing more than one page while a request is in flight.
+  useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    if (
+      !sentinel ||
+      loading ||
+      loadingMore ||
+      loadMoreError ||
+      page >= totalPages
+    ) return;
+
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting || requestLockedRef.current) return;
+        requestLockedRef.current = true;
+        setPage((currentPage) => {
+          if (currentPage >= totalPages) {
+            requestLockedRef.current = false;
+            return currentPage;
+          }
+          return currentPage + 1;
+        });
+      },
+      { rootMargin: "0px", threshold: 0.01 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [items.length, loading, loadingMore, loadMoreError, page, totalPages]);
 
   if (!isPlayableType(type)) return <Navigate to="/" replace />;
 
@@ -131,15 +191,27 @@ const Browse = () => {
           className="scrollbar-none flex max-w-full gap-2 overflow-x-auto"
           role="group"
           aria-label="Filter by genre"
+          aria-busy={genresLoading}
         >
-          <button
-            onClick={() => setActiveGenre(null)}
-            aria-pressed={activeGenre === null}
-            className={pill(activeGenre === null)}
-          >
-            All
-          </button>
-          {genres.map((genre) => (
+          {genresLoading ? (
+            Array.from({ length: 7 }).map((_, index) => (
+              <span
+                key={index}
+                aria-hidden="true"
+                className="skeleton h-[30px] shrink-0 rounded-full"
+                style={{ width: `${index % 3 === 0 ? 72 : 92}px` }}
+              />
+            ))
+          ) : (
+            <button
+              onClick={() => setActiveGenre(null)}
+              aria-pressed={activeGenre === null}
+              className={pill(activeGenre === null)}
+            >
+              All
+            </button>
+          )}
+          {!genresLoading && genres.map((genre) => (
             <button
               key={genre.id}
               onClick={() =>
@@ -177,35 +249,51 @@ const Browse = () => {
         </div>
       ) : (
         <>
-          <div data-media-layout className="media-grid mt-8 gap-x-3 gap-y-7 sm:gap-x-4">
-            {loading
-              ? Array.from({ length: 18 }).map((_, i) => (
-                  <div key={i} className="media-grid-item">
-                    <div className="skeleton aspect-[2/3] rounded-card" />
-                    <div className="skeleton mt-2.5 h-3.5 w-3/4 rounded" />
-                    <div className="skeleton mt-1.5 h-3 w-1/3 rounded" />
-                  </div>
-                ))
-              : items.map((item, i) => (
+          {loading ? (
+            <BrowseSkeleton label={heading} />
+          ) : (
+            <div data-media-layout className="media-grid mt-8 gap-x-3 gap-y-7 sm:gap-x-4">
+              {items.map((item, i) => (
                   // Stagger resets each row of 6 so later pages don't inherit
                   // an ever-growing delay.
                   <Reveal data-media-slot className="media-grid-item" key={`${item.id}-${i}`} delay={(i % 6) * 40}>
                     <MediaCard item={item} fallbackType={type} className="w-full" />
                   </Reveal>
                 ))}
-          </div>
+            </div>
+          )}
 
-          {!loading && page < totalPages && (
-            <div className="mt-12 flex justify-center">
-              <button
-                onClick={() => setPage((p) => p + 1)}
-                disabled={loadingMore}
-                className="rounded-full border border-hairline px-8 py-3 text-caption
-                           font-semibold text-ink transition hover:border-hairline-strong
-                           hover:bg-surface-2 disabled:opacity-60"
-              >
-                {loadingMore ? "Loading..." : "Load more"}
-              </button>
+          {!loading && (
+            <div
+              ref={loadMoreRef}
+              className="mt-8 flex min-h-20 items-center justify-center"
+              aria-live="polite"
+            >
+              {loadingMore && (
+                <div className="flex items-center gap-3 text-caption text-muted" role="status">
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-hairline-strong border-t-accent" aria-hidden="true" />
+                  Loading more {heading.toLowerCase()}…
+                </div>
+              )}
+              {loadMoreError && (
+                <div className="text-center">
+                  <p className="text-caption text-muted">{loadMoreError}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      requestLockedRef.current = true;
+                      setLoadMoreError(null);
+                      setRetryKey((key) => key + 1);
+                    }}
+                    className="mt-3 rounded-full border border-hairline px-5 py-2 text-caption font-semibold text-ink transition hover:border-hairline-strong hover:bg-surface-2"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+              {!loadingMore && !loadMoreError && page >= totalPages && items.length > 0 && (
+                <p className="text-caption text-faint">You&rsquo;ve reached the end.</p>
+              )}
             </div>
           )}
         </>

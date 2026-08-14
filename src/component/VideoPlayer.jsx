@@ -63,6 +63,8 @@ const VideoPlayer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isPictureInPicture, setIsPictureInPicture] = useState(false);
+  const [isMiniPlayer, setIsMiniPlayer] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [volume, setVolume] = useState(1);
   const [buffered, setBuffered] = useState(0);
@@ -194,6 +196,7 @@ const VideoPlayer = () => {
         ytControls: 0,
         enablePrivacyEnhancedMode: true,
         modestbranding: 1,
+        playsinline: 1,
         rel: 0,
       },
     });
@@ -272,7 +275,8 @@ const VideoPlayer = () => {
   useEffect(() => {
     const onChange = () => {
       const active = Boolean(
-        document.fullscreenElement || document.webkitFullscreenElement
+        document.fullscreenElement ||
+          document.webkitFullscreenElement
       );
       setIsFullScreen(active);
       showControlsTemporarily();
@@ -282,19 +286,43 @@ const VideoPlayer = () => {
     return () => events.forEach((e) => document.removeEventListener(e, onChange));
   }, [showControlsTemporarily]);
 
-  const toggleFullscreen = useCallback(() => {
-    const el = shellRef.current;
-    if (!el) return;
-    const active =
-      document.fullscreenElement || document.webkitFullscreenElement;
-    if (active) {
-      (document.exitFullscreen || document.webkitExitFullscreen)?.call(
-        document
-      );
-    } else {
-      (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+  useEffect(() => {
+    if (!isFullScreen) return;
+    const originalOverflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = originalOverflow;
+    };
+  }, [isFullScreen]);
+
+  const toggleFullscreen = useCallback(async () => {
+    const shell = shellRef.current;
+    if (!shell) return;
+
+    setIsMiniPlayer(false);
+    try {
+      if (isFullScreen) {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+          await exit?.call(document);
+        }
+        setIsFullScreen(false);
+      } else {
+        const request = shell.requestFullscreen || shell.webkitRequestFullscreen;
+
+        // iPhone Safari has historically not allowed arbitrary elements to
+        // enter native fullscreen. Use the same full-window presentation
+        // Video.js recommends for unsupported mobile environments.
+        if (!videojs.browser.IS_IOS && request) {
+          await request.call(shell);
+        }
+        setIsFullScreen(true);
+      }
+    } catch (error) {
+      setIsFullScreen(false);
+      console.warn("Fullscreen request was rejected:", error);
     }
-  }, []);
+  }, [isFullScreen]);
 
   // ---- Controls -----------------------------------------------------------
 
@@ -336,16 +364,32 @@ const VideoPlayer = () => {
   };
 
   const togglePiP = useCallback(async () => {
+    const video = playerRef.current?.el()?.querySelector("video");
     try {
       if (document.pictureInPictureElement) {
         await document.exitPictureInPicture();
+        setIsPictureInPicture(false);
         return;
       }
-      const el = playerRef.current?.el()?.querySelector("video");
-      if (el?.requestPictureInPicture) await el.requestPictureInPicture();
-    } catch {
-      // PiP isn't available for YouTube iframes in most browsers; ignore.
+      if (video?.requestPictureInPicture && document.pictureInPictureEnabled) {
+        await video.requestPictureInPicture();
+        setIsPictureInPicture(true);
+        return;
+      }
+      if (video?.webkitSupportsPresentationMode?.("picture-in-picture")) {
+        const entering = video.webkitPresentationMode !== "picture-in-picture";
+        video.webkitSetPresentationMode(entering ? "picture-in-picture" : "inline");
+        setIsPictureInPicture(entering);
+        return;
+      }
+    } catch (error) {
+      console.warn("Native picture in picture was rejected:", error);
     }
+
+    // The YouTube tech is a cross-origin iframe, so browsers do not expose a
+    // native <video> for PiP. Keep the control useful with an in-app floating
+    // player that works consistently on iPhone, Android and desktop.
+    setIsMiniPlayer((current) => !current);
   }, []);
 
   // Keyboard shortcuts, the standard set every video site implements.
@@ -451,8 +495,10 @@ const VideoPlayer = () => {
     max-width, rounding and aspect ratio drop away.
   */
   const stageClass = isFullScreen
-    ? "gt-stage fixed inset-0 z-[100] h-screen w-screen rounded-none bg-black"
-    : "gt-stage relative aspect-video w-full overflow-clip rounded-sheet bg-black ring-1 ring-hairline";
+    ? "gt-stage gt-stage-fullscreen fixed inset-0 z-[100] h-[100dvh] w-screen rounded-none bg-black"
+    : isMiniPlayer
+      ? "gt-stage gt-mini-player fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-3 z-[90] aspect-video w-[min(88vw,420px)] overflow-clip rounded-sheet bg-black shadow-2xl ring-1 ring-white/20 sm:right-5"
+      : "gt-stage relative aspect-video w-full overflow-clip rounded-sheet bg-black ring-1 ring-hairline";
 
   return (
     <main className="px-4 py-6 md:px-10 md:py-8">
@@ -469,12 +515,13 @@ const VideoPlayer = () => {
           </div>
         )}
 
-        <div
-          ref={shellRef}
-          className={`${stageClass} ${controlsShown ? "" : "cursor-none"}`}
-          onMouseMove={showControlsTemporarily}
-          onTouchStart={showControlsTemporarily}
-        >
+        <div className={isMiniPlayer ? "aspect-video w-full" : ""}>
+          <div
+            ref={shellRef}
+            className={`${stageClass} ${controlsShown ? "" : "cursor-none"}`}
+            onMouseMove={showControlsTemporarily}
+            onTouchStart={showControlsTemporarily}
+          >
           {/* Sizing lives in index.css under `.gt-stage` — see the note there
               about Video.js's default 300x150 and YouTube's attribute-sized
               iframe. */}
@@ -516,7 +563,7 @@ const VideoPlayer = () => {
 
           {/* Control bar */}
           <div
-            className={`absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/95
+            className={`gt-player-controls absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/95
                         via-black/55 to-transparent px-3 pb-3 pt-14 transition-opacity
                         duration-300 md:px-4 ${
                           controlsShown ? "opacity-100" : "pointer-events-none opacity-0"
@@ -638,8 +685,9 @@ const VideoPlayer = () => {
 
               <button
                 onClick={togglePiP}
-                aria-label="Picture in picture"
-                className="hidden h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/10 sm:flex"
+                aria-label={isMiniPlayer || isPictureInPicture ? "Exit picture in picture" : "Picture in picture"}
+                aria-pressed={isMiniPlayer || isPictureInPicture}
+                className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/10"
               >
                 <PictureInPicture2 size={17} aria-hidden="true" />
               </button>
@@ -656,6 +704,7 @@ const VideoPlayer = () => {
               </button>
             </div>
           </div>
+        </div>
         </div>
 
         {/* ---------- Below the player ---------- */}

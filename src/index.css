@@ -466,6 +466,130 @@
   animation: gt-shimmer 1.6s infinite;
 }
 
+.browse-card-skeleton::before {
+  content: "";
+  position: absolute;
+  inset: 35% 0 0;
+  background: linear-gradient(to top, rgba(5, 5, 7, 0.9), transparent);
+}
+
+/* Cinematic, image-free artwork used by both authentication pages. */
+.auth-visual {
+  background:
+    radial-gradient(circle at 72% 28%, rgba(225, 29, 46, 0.22), transparent 30%),
+    radial-gradient(circle at 22% 76%, rgba(116, 53, 255, 0.12), transparent 34%),
+    linear-gradient(145deg, #19191f 0%, #0d0d10 58%, #08080a 100%);
+}
+.auth-visual::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,.035) 48%, transparent 68%);
+  transform: translateX(-70%);
+  animation: gt-auth-light 8s var(--ease-out-soft) infinite;
+  pointer-events: none;
+}
+.auth-visual-grid {
+  opacity: .16;
+  background-image:
+    linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: linear-gradient(to bottom, black, transparent 78%);
+}
+.auth-visual-glow {
+  animation: gt-auth-pulse 5s ease-in-out infinite alternate;
+}
+.auth-poster-stage {
+  perspective: 1200px;
+  transform: translateY(-4%);
+}
+.auth-poster {
+  position: absolute;
+  width: clamp(180px, 21vw, 300px);
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 1rem;
+  box-shadow: 0 32px 80px rgba(0,0,0,.52);
+}
+.auth-poster-left,
+.auth-poster-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.5rem;
+  opacity: .55;
+}
+.auth-poster-left {
+  background: linear-gradient(150deg, #30202a, #121217 65%);
+  transform: translateX(-42%) rotateY(18deg) rotate(-8deg) scale(.82);
+}
+.auth-poster-right {
+  align-items: flex-end;
+  background: linear-gradient(210deg, #33210d, #141418 62%);
+  transform: translateX(42%) rotateY(-18deg) rotate(8deg) scale(.82);
+}
+.auth-poster-number {
+  font-size: 4rem;
+  font-weight: 800;
+  line-height: 1;
+  color: rgba(255,255,255,.12);
+}
+.auth-poster-line {
+  width: 55%;
+  height: 2px;
+  background: rgba(255,255,255,.18);
+}
+.auth-poster-main {
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  background:
+    linear-gradient(to top, rgba(8,8,10,.96), transparent 66%),
+    conic-gradient(from 220deg at 50% 42%, #15151a, #6e1220, #16161b, #ac1728, #15151a);
+  animation: gt-auth-float 6s ease-in-out infinite alternate;
+}
+.auth-poster-halo {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  width: 68%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255,255,255,.24);
+  border-radius: 50%;
+  box-shadow: 0 0 0 22px rgba(255,255,255,.035), 0 0 0 46px rgba(255,255,255,.018);
+  transform: translateX(-50%);
+}
+.auth-poster-play {
+  position: absolute;
+  z-index: 2;
+  top: 39%;
+  left: 50%;
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.45);
+  border-radius: 50%;
+  color: white;
+  background: rgba(9,9,12,.38);
+  box-shadow: 0 12px 36px rgba(0,0,0,.35);
+  backdrop-filter: blur(10px);
+  transform: translate(-50%, -50%);
+}
+
+@keyframes gt-auth-float {
+  to { transform: translateY(-10px) rotateX(1deg); }
+}
+@keyframes gt-auth-pulse {
+  to { transform: scale(1.14); opacity: .72; }
+}
+@keyframes gt-auth-light {
+  55%, 100% { transform: translateX(75%); }
+}
+
 /* ==========================================================================
    Scroll reveals
 
@@ -547,6 +671,28 @@
 .gt-stage .vjs-control-bar,
 .gt-stage .vjs-loading-spinner {
   display: none !important;
+}
+
+/* Full-window fallback used by Video.js on iPhone, where fullscreening an
+   arbitrary page element may be unavailable even though video playback is
+   supported. Keep controls above the home indicator. */
+.gt-stage-fullscreen .gt-player-controls {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.gt-mini-player {
+  animation: gt-player-pop var(--duration-base) var(--ease-emphasis) both;
+}
+
+@keyframes gt-player-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* ==========================================================================

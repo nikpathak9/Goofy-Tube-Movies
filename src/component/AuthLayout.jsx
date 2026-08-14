@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Clapperboard } from "lucide-react";
+import { ArrowLeft, Clapperboard, Play, Sparkles, Star } from "lucide-react";
 
 /**
  * Split layout shared by Sign In and Sign Up: form on the left, a poster
@@ -37,25 +37,50 @@ const AuthLayout = ({ title, subtitle, children, footer }) => (
       </div>
     </div>
 
-    {/* Decorative panel */}
+    {/* Decorative cinematic panel. CSS artwork avoids blocking auth on a
+        remote poster request and stays crisp at every desktop size. */}
     <div
-      className="relative hidden overflow-hidden bg-surface lg:block"
+      className="auth-visual relative hidden overflow-hidden lg:block"
       aria-hidden="true"
     >
-      <div className="absolute inset-0 grid grid-cols-3 gap-3 p-3 opacity-30">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div
-            key={i}
-            className="skeleton rounded-card"
-            style={{ animationDelay: `${i * 90}ms` }}
-          />
-        ))}
+      <div className="auth-visual-grid absolute inset-0" />
+      <div className="auth-visual-glow absolute -right-24 top-[12%] h-96 w-96 rounded-full bg-accent/25 blur-3xl" />
+
+      <div className="absolute inset-x-0 top-10 flex items-center gap-4 overflow-hidden whitespace-nowrap px-10 text-[10px] font-semibold uppercase tracking-[0.32em] text-white/30">
+        <span>Now showing</span><span className="h-px flex-1 bg-white/10" />
+        <span>Goofy Tube Cinema</span>
       </div>
-      <div className="absolute inset-0 bg-gradient-to-br from-accent/25 via-base/70 to-base" />
-      <div className="absolute inset-x-0 bottom-0 p-12">
-        <p className="text-h2 text-ink">Every trailer. One place.</p>
-        <p className="mt-2 max-w-xs text-body text-muted">
-          Browse popular and top-rated movies and shows, powered by TMDB.
+
+      <div className="auth-poster-stage absolute inset-0 flex items-center justify-center">
+        <div className="auth-poster auth-poster-left">
+          <span className="auth-poster-number">02</span>
+          <span className="auth-poster-line" />
+        </div>
+        <div className="auth-poster auth-poster-right">
+          <Star size={28} className="text-gold/70" />
+          <span className="auth-poster-line" />
+        </div>
+        <div className="auth-poster auth-poster-main">
+          <div className="auth-poster-halo" />
+          <span className="eyebrow text-white/70">Featured tonight</span>
+          <div className="auth-poster-play">
+            <Play size={22} className="ml-0.5 fill-current" />
+          </div>
+          <div className="relative z-10 mt-auto">
+            <div className="mb-3 flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/60">
+              <Sparkles size={12} /> Curated for you
+            </div>
+            <p className="display-title text-[2rem] leading-[0.9] text-white">
+              Stories worth staying up for
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-base via-base/90 to-transparent px-12 pb-10 pt-24">
+        <p className="text-h2 text-ink">Your next favorite is waiting.</p>
+        <p className="mt-2 max-w-sm text-body text-muted">
+          Save your watch list, discover new releases, and jump back into the stories you love.
         </p>
       </div>
     </div>

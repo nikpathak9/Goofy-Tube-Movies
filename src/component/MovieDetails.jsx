@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, Star, Play, Plus, Check } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Star, Play, Plus, Check, ExternalLink } from "lucide-react";
 import MediaRail from "./MediaRail";
 import HeroTrailer from "./HeroTrailer";
 import Reveal from "./Reveal";
@@ -9,6 +9,23 @@ import { profileImage, backdropUrl } from "../lib/images";
 import { useWatchlist } from "../lib/useWatchlist";
 
 const CACHE_TTL = 3600 * 1000; // 1 hour
+const DEFAULT_WATCH_REGION = "IN";
+
+const PROVIDER_GROUPS = [
+  ["flatrate", "Stream"],
+  ["free", "Watch free"],
+  ["ads", "Free with ads"],
+  ["rent", "Rent"],
+  ["buy", "Buy"],
+];
+
+function regionName(region) {
+  try {
+    return new Intl.DisplayNames([navigator.language], { type: "region" }).of(region) || region;
+  } catch {
+    return region;
+  }
+}
 
 /** Reads a cached payload, tolerating corrupt or evicted entries. */
 function readCache(key) {
@@ -56,6 +73,11 @@ const MovieDetails = () => {
   const [directors, setDirectors] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [images, setImages] = useState([]);
+  const [watchProviders, setWatchProviders] = useState({});
+  const [watchRegion, setWatchRegion] = useState(DEFAULT_WATCH_REGION);
+  const [providersLoading, setProvidersLoading] = useState(true);
+  const [providersError, setProvidersError] = useState(false);
+  const [providersRetryKey, setProvidersRetryKey] = useState(0);
   const galleryRef = useRef(null);
   const [galleryEdges, setGalleryEdges] = useState({ start: true, end: false });
 
@@ -180,6 +202,64 @@ const MovieDetails = () => {
     return () => controller.abort();
   }, [id, type]);
 
+  useEffect(() => {
+    if (!isPlayableType(type)) return;
+    const controller = new AbortController();
+
+    const applyProviders = (results) => {
+      const nextProviders = results || {};
+      const regions = Object.keys(nextProviders);
+      setWatchProviders(nextProviders);
+      setWatchRegion((current) => {
+        if (nextProviders[current]) return current;
+        if (nextProviders[DEFAULT_WATCH_REGION]) return DEFAULT_WATCH_REGION;
+        if (nextProviders.US) return "US";
+        return regions[0] || DEFAULT_WATCH_REGION;
+      });
+    };
+
+    const fetchProviders = async () => {
+      setProvidersLoading(true);
+      setProvidersError(false);
+
+      const cacheKey = `tmdb_watch_${type}_${id}_v1`;
+      const cached = readCache(cacheKey);
+      if (cached) {
+        applyProviders(cached);
+        setProvidersLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `https://api.themoviedb.org/3/${type}/${id}/watch/providers`,
+          {
+            signal: controller.signal,
+            headers: {
+              accept: "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_TMDB_READ_TOKEN}`,
+            },
+          }
+        );
+        if (!response.ok) throw new Error(`TMDB responded ${response.status}`);
+        const data = await response.json();
+        if (controller.signal.aborted) return;
+        applyProviders(data.results);
+        writeCache(cacheKey, data.results || {});
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          console.error("Failed to fetch watch providers:", error);
+          setProvidersError(true);
+        }
+      } finally {
+        if (!controller.signal.aborted) setProvidersLoading(false);
+      }
+    };
+
+    fetchProviders();
+    return () => controller.abort();
+  }, [id, type, providersRetryKey]);
+
   const formatDate = (dateStr) => {
     if (!dateStr) return "Unknown";
     const date = new Date(dateStr);
@@ -287,6 +367,15 @@ const MovieDetails = () => {
   ];
 
   const inWatchlist = watchlist.includes(watchKey);
+  const availableRegions = Object.keys(watchProviders).sort((a, b) =>
+    regionName(a).localeCompare(regionName(b))
+  );
+  const regionalProviders = watchProviders[watchRegion];
+  const providerGroups = PROVIDER_GROUPS.map(([key, label]) => [
+    key,
+    label,
+    regionalProviders?.[key] || [],
+  ]).filter(([, , providers]) => providers.length > 0);
 
   return (
     <div>
@@ -411,6 +500,111 @@ const MovieDetails = () => {
             </div>
           ))}
         </dl>
+      </Reveal>
+
+      {/* ---------- Regional streaming availability ---------- */}
+      <Reveal as="section" className="mx-auto max-w-[1400px] px-4 pb-14 md:px-10">
+        <div className="flex flex-wrap items-end justify-between gap-5 border-t border-hairline pt-12">
+          <div>
+            <p className="eyebrow">Availability</p>
+            <h2 className="mt-2 text-h2 text-ink">Where to watch</h2>
+            <p className="mt-2 max-w-xl text-caption text-muted">
+              Streaming availability varies by country and can change over time.
+            </p>
+          </div>
+
+          {availableRegions.length > 0 && (
+            <label className="flex items-center gap-2 text-caption text-faint">
+              Region
+              <select
+                value={watchRegion}
+                onChange={(event) => setWatchRegion(event.target.value)}
+                className="rounded-lg border border-hairline bg-surface px-3 py-2 text-caption text-ink transition hover:border-hairline-strong focus:outline-none focus:ring-2 focus:ring-accent/50"
+              >
+                {availableRegions.map((region) => (
+                  <option value={region} key={region}>
+                    {regionName(region)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+
+        {providersLoading ? (
+          <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5" aria-label="Loading watch providers" role="status">
+            <span className="sr-only">Loading watch providers…</span>
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} aria-hidden="true" className="skeleton h-[74px] rounded-sheet" />
+            ))}
+          </div>
+        ) : providersError ? (
+          <div className="mt-7 rounded-sheet border border-hairline bg-surface px-5 py-6">
+            <p className="text-caption text-muted">Watch availability could not be loaded.</p>
+            <button
+              type="button"
+              onClick={() => setProvidersRetryKey((key) => key + 1)}
+              className="mt-3 rounded-full border border-hairline-strong px-4 py-2 text-caption font-semibold text-ink transition hover:bg-surface-2"
+            >
+              Try again
+            </button>
+          </div>
+        ) : providerGroups.length > 0 ? (
+          <div className="mt-8 space-y-8">
+            {providerGroups.map(([key, label, providers]) => (
+              <div key={key}>
+                <h3 className="text-caption font-semibold text-ink">{label}</h3>
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  {providers.map((provider) => (
+                    <a
+                      key={provider.provider_id}
+                      href={regionalProviders.link}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      aria-label={`See where to watch ${title} with ${provider.provider_name} in ${regionName(watchRegion)}`}
+                      className="group flex min-w-0 items-center gap-3 rounded-sheet border border-hairline bg-surface p-3 transition duration-200 hover:-translate-y-0.5 hover:border-hairline-strong hover:bg-surface-2"
+                    >
+                      {provider.logo_path ? (
+                        <img
+                          src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-lg font-semibold text-faint">
+                          {provider.provider_name.charAt(0)}
+                        </span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-2 block text-caption font-semibold leading-tight text-ink">
+                          {provider.provider_name}
+                        </span>
+                        <span className="mt-1 block text-[10px] text-faint">View options</span>
+                      </span>
+                      <ExternalLink size={14} className="shrink-0 text-faint transition group-hover:text-ink" aria-hidden="true" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <p className="text-[11px] text-faint">
+              Availability data provided by{" "}
+              <a href="https://www.justwatch.com/" target="_blank" rel="noreferrer noopener" className="underline decoration-hairline-strong underline-offset-4 transition hover:text-muted">
+                JustWatch
+              </a>
+              . Provider links open TMDB&rsquo;s regional watch page.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-7 rounded-sheet border border-hairline bg-surface px-5 py-6">
+            <p className="text-caption text-muted">
+              No streaming, rental, or purchase information is currently available for {regionName(watchRegion)}.
+            </p>
+          </div>
+        )}
       </Reveal>
 
       {/* ---------- Cast ---------- */}
