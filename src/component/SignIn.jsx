@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Lock, Mail, AlertCircle } from "lucide-react";
 import AuthLayout, { AuthField } from "./AuthLayout";
 import { useAuth } from "../lib/useAuth";
-import { findAccount, readAccounts } from "../lib/authStorage";
+import { authStorageError, findAccount, readAccounts } from "../lib/authStorage";
 
 const SignIn = () => {
   const [email, setEmail] = useState("");
@@ -40,8 +40,8 @@ const SignIn = () => {
 
       setUser(matchedUser);
       navigate(returnTo, { replace: true });
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (storageError) {
+      setError(authStorageError(storageError, "sign-in"));
     } finally {
       setLoading(false);
     }

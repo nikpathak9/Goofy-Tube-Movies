@@ -9,7 +9,9 @@ import { profileImage, backdropUrl } from "../lib/images";
 import { useWatchlist } from "../lib/useWatchlist";
 
 const CACHE_TTL = 3600 * 1000; // 1 hour
+const MAX_MEDIA_CACHE_ENTRIES = 12;
 const DEFAULT_WATCH_REGION = "IN";
+const mediaCache = new Map();
 
 const PROVIDER_GROUPS = [
   ["flatrate", "Stream"],
@@ -29,22 +31,18 @@ function regionName(region) {
 
 /** Reads a cached payload, tolerating corrupt or evicted entries. */
 function readCache(key) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (Date.now() - parsed.timestamp > CACHE_TTL) return null;
-    return parsed.value;
-  } catch {
-    return null;
-  }
+  const cached = mediaCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.timestamp <= CACHE_TTL) return cached.value;
+  mediaCache.delete(key);
+  return null;
 }
 
 function writeCache(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify({ value, timestamp: Date.now() }));
-  } catch {
-    // QuotaExceededError — the cache is an optimisation, not a requirement.
+  mediaCache.delete(key);
+  mediaCache.set(key, { value, timestamp: Date.now() });
+  while (mediaCache.size > MAX_MEDIA_CACHE_ENTRIES) {
+    mediaCache.delete(mediaCache.keys().next().value);
   }
 }
 

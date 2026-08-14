@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { writeAuthValue } from "./authStorage";
 
 export const AUTH_CHANGED = "auth:changed";
 
@@ -26,7 +27,7 @@ export function useAuth() {
   }, []);
 
   const setUser = useCallback((nextUser) => {
-    if (nextUser) localStorage.setItem("user", JSON.stringify(nextUser));
+    if (nextUser) writeAuthValue("user", nextUser);
     else localStorage.removeItem("user");
     setUserState(nextUser);
     window.dispatchEvent(new Event(AUTH_CHANGED));

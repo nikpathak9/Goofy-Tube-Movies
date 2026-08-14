@@ -3,7 +3,13 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Lock, Mail, User, AlertCircle } from "lucide-react";
 import AuthLayout, { AuthField } from "./AuthLayout";
 import { useAuth } from "../lib/useAuth";
-import { accountExists, normalizeEmail, readAccounts } from "../lib/authStorage";
+import {
+  accountExists,
+  authStorageError,
+  normalizeEmail,
+  readAccounts,
+  writeAccounts,
+} from "../lib/authStorage";
 
 /** Cheap, honest strength signal — no library needed. */
 function scorePassword(pw) {
@@ -71,12 +77,18 @@ const SignUp = () => {
       }
 
       const newUser = { name: name.trim(), email: normalizeEmail(email), password };
-      users.push(newUser);
-      localStorage.setItem("users", JSON.stringify(users));
-      setUser(newUser);
+      writeAccounts([...users, newUser]);
+      try {
+        setUser(newUser);
+      } catch (sessionError) {
+        // Do not leave an account record behind when the active session could
+        // not be established; otherwise the retry looks like a duplicate.
+        writeAccounts(users);
+        throw sessionError;
+      }
       navigate(returnTo, { replace: true });
-    } catch {
-      setError("Registration failed. Please try again.");
+    } catch (storageError) {
+      setError(authStorageError(storageError, "registration"));
     } finally {
       setLoading(false);
     }
